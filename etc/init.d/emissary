@@ -1,0 +1,50 @@
+#!/bin/sh
+# $Id: emissary 496 2009-03-14 02:26:46Z ccorliss $
+# emissary      This shell script takes care of starting and stopping emissary.
+#
+# chkconfig: 2345 99 10
+# description: emissary provides support for handling of network events.
+
+CONFIG_FILE=/etc/emissary/config.ini
+EMISSARY_EXECUTABLE="$(ruby -rrubygems -e 'puts Gem.bindir')/emissary"
+
+[ -f "${CONFIG_FILE}" ] || exit 0
+
+. /etc/rc.d/init.d/functions
+
+if [ -f /etc/sysconfig/emissary ]; then
+	. /etc/sysconfig/emissary
+fi
+
+# See how we were called.
+case "$1" in
+  start)
+    # Start daemon.
+    echo -n "Starting emissary: "
+    daemon ${EMISSARY_EXECUTABLE} -d --config-file ${CONFIG_FILE} start
+    touch /var/lock/subsys/emissary
+    echo    
+    ;;
+  stop)
+    # Stop daemon.
+    echo -n "Shutting down emissary: "
+    daemon ${EMISSARY_EXECUTABLE} --config-file ${CONFIG_FILE} stop
+    echo
+    rm -f /var/lock/subsys/emissary
+    ;;
+  restart)
+    daemon ${EMISSARY_EXECUTABLE} --config-file ${CONFIG_FILE} restart
+    ;;
+  status)
+    daemon ${EMISSARY_EXECUTABLE} --config-file ${CONFIG_FILE} status
+    ;;
+  reconfig)
+    daemon ${EMISSARY_EXECUTABLE} --config-file ${CONFIG_FILE} reconfig
+  	;;
+  *)
+    echo "Usage: emissary {start|stop|restart|status|reconfig}"
+    exit 1
+    ;;
+esac
+
+exit 0

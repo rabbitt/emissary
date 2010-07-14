@@ -1,0 +1,198 @@
+#!/bin/env ruby
+# $Id$
+# == Synopsis
+#   This is a sample description of the application.
+#   ...
+#
+# == Examples
+#   This command does ...
+#     emissary-events
+#
+# == Usage
+#   emissary-events [options] -hvV [-c config-file] [--pid-dir /path/to/pid/dir] [--interval #[smh]]
+#
+#   For help use: emissary -h
+#
+# == Options
+#   -h, --help          Displays help message
+#   -v, --version       Display the version, then exit
+#   -V, --verbose       Verbose output
+#   -c, --config-file   File containing configuration values for emissary
+#   --daemonize         Run script in background
+#
+# == Author
+#   Carl P. Corliss <carl.corliss@nytimes.com>
+#
+# == Copyright
+#   Copyright (c) 2009 the New York Times. Licensed under the MIT License:
+#   http://www.opensource.org/licenses/mit-license.php
+
+# if located in home directory, try to load the libraries for it from there as well
+
+if File.expand_path($0) =~ /^#{ENV['HOME']}/
+	$:.unshift File.expand_path(File.dirname(File.expand_path($0)) + '/../lib')
+end
+
+require 'rubygems'
+require 'rdoc/ri/ri_paths' # fixes bug in rdoc
+require 'rdoc/usage'
+
+require 'singleton'
+require 'fileutils'
+require 'optparse'
+
+require 'emissary'
+require 'emissary/daemon'
+require 'emissary/config'
+require 'emissary/logger'
+
+class EmissaryClient
+	VERSION = '$Revision: 18411 $'.match(/[0-9]+/)[0]
+	DEFAULT_CONFIG_FILE = "/etc/emissary/config.ini"
+
+	attr_accessor :log, :daemon, :log_level, :config_file, :daemonize
+
+	def initialize(arguments, stdin)
+		@arguments = arguments
+		@stdin = stdin
+
+		@config_file = DEFAULT_CONFIG_FILE
+
+		@daemon = nil
+		@daemonize = false
+
+		@log_level = :debug
+		@log = Emissary::Logger.instance
+	end
+
+	# Parse options, check arguments, then process the command
+	def run
+		if parsed_options? && options_valid?
+			process_command
+		else
+			output_usage
+		end
+	end
+
+protected
+
+	def parsed_options?
+		# Specify options
+		opts = OptionParser.new
+		opts.on('-v', '--version')	     { output_version ; exit 0 }
+		opts.on('-h', '--help')		       { output_help }
+		opts.on('-D', '--daemonize')     { @daemonize = true }
+		opts.on('-l [N]', '--log-level [N]')    do  |level|  @log_level = level; end
+		opts.on('-c FILE', '--config-file FILE') do  |config| @config_file = config; end
+
+		opts.parse!(@arguments) rescue return false
+
+		true
+	end
+
+	def output_options
+		puts "Options:\n"
+		pp @options
+	end
+
+	# True if required arguments were provided
+	def options_valid?
+		if !test(?r, config_file)
+			if !test(?f, config_file)
+				puts "Configuration file '#{config_file}' does not exist!"
+			else
+				puts "Configuration file '#{config_file}' is not readable!"
+			end
+			return false
+		end
+		return true
+	end
+
+	def output_help
+		output_version
+		RDoc::usage() #exits app
+	end
+
+	def output_usage
+		RDoc::usage('usage') # gets usage from comments above
+	end
+
+	def output_version
+		puts "#{File.basename(__FILE__)} version #{VERSION}"
+	end
+
+	def command_valid?
+		return false if (@arguments[0].strip rescue '').blank?
+		return false unless [ :start, :stop, :restart, :reconfig, :status ].include? @arguments[0].strip.downcase.to_sym
+		return true
+	end
+
+	def process_command
+		command = @arguments[0].strip.downcase.to_sym rescue nil
+		unless command_valid?
+			@log.error("Invalid command '#{command.to_s}' - please specify start, stop, restart, reload, or status.")
+			exit 1
+		end
+
+		@daemon = Emissary::Daemon.new('emissary-master',
+			:log_level => log_level,
+			:config_file => config_file,
+			:daemonize => !!@daemonize
+		)
+
+		self.__send__(command)
+	end
+
+	def pid
+		@daemon.pid
+	end
+	
+	def if_started &block
+		if @daemon.alive?
+			yield
+		else
+			@log.warn "Emissary is not running"
+		end
+	end
+
+	def unless_started &block
+		unless @daemon.alive?
+			yield
+		else
+			@log.warn "Emissary running with pid '#{pid}'"
+		end
+	end
+	
+	def status
+		unless_started do
+			@log.warn "Emissary is not running."
+		end
+	end
+
+	def restart
+		if_started do
+			Process.kill('USR1', pid)
+		end
+	end
+
+	def reconfig
+		if_started do
+			Process.kill('HUP', pid)
+		end
+	end
+
+	def stop
+		if_started do
+			Process.kill('TERM', pid)
+		end
+	end
+
+	def start
+		unless_started do
+			@daemon.startup
+		end
+	end
+end
+
+# Create and run the application
+EmissaryClient.new(ARGV.collect{|v| v.strip.downcase}, STDIN).run

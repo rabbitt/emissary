@@ -1,0 +1,75 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'rubygems/source_index'
+
+require 'fileutils'
+
+class Object
+	def blank?
+		nil? or empty?
+	end
+end
+
+if ARGV.length != 1
+	puts File.basename($0) << ': <config path>'
+	exit 0
+end
+
+config_path = ARGV[0].to_s
+
+if not File.exists?(config_path)
+	puts "Directory [#{config_path}] doesn't exist - creating."
+	FileUtils.mkdir_p config_path
+end
+
+si = Gem::SourceIndex.from_gems_in(*Gem::SourceIndex.installed_spec_directories)
+
+gem_spec = si.find_name('emissary', Gem::Requirement.default).last
+
+emissary_etc_path = File.join(gem_spec.full_gem_path, 'etc')
+
+if emissary_etc_path.blank?
+	puts "Unable to find gem 'emissary' in the default gem paths - are you sure you installed it?"
+	exit 1
+end
+
+puts "Emissary Path: '#{emissary_etc_path}'"
+puts "Checking ETC files"
+
+['emissary', 'init.d', 'sysconfig'].each do |part|
+
+
+	src_path = File.join(emissary_etc_path, part)
+	dst_path = File.join(config_path, part)
+
+	puts "Configuration files for '#{part}' found at: #{src_path}"
+
+	if not File.exists?(dst_path)
+		puts "  - Creating missing '#{dst_path}' directory."
+		FileUtils.mkdir_p [ dst_path ]
+	end
+
+	Dir.glob(src_path + '/*').each do |file|
+		src_file = File.join(src_path, File.basename(file))
+		dst_file = File.join(dst_path, File.basename(file))
+
+		if not File.exists?(dst_file)
+			puts "  - Copying '#{src_file}' --> '#{dst_file}'"
+			FileUtils.cp src_file, dst_file
+		else
+			puts "  - Skipping overwrite of pre-existing configuration file '#{dst_file}'"
+		end
+	end
+end
+
+
+print "Checking run directory - "
+if not File.exists?('/var/run/emissary')
+	puts "missing!\n  - Creating missing '/var/run/emissary' run directory"
+	FileUtils.mkdir_p ['/var/run/emissary']
+else
+	puts "looks good."
+end
+
+puts "Setup done - please adjust your configuration files to meet your particular needs now."
