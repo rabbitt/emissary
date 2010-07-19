@@ -75,11 +75,10 @@ module Emissary
     def self.new(host, user, password, timeout = nil)
       @@class_monitor.synchronize do
         (@@lockers||={})["#{host}:#{user}"] ||= begin
-            allocate.instance_eval {
-              timeout ||= DEFAULT_TIMEOUT
-              initialize(host, user, password, timeout)
+            allocate.instance_eval(<<-EOS, __FILE__, __LINE__)
+              initialize(host, user, password, timeout || DEFAULT_TIMEOUT)
               self
-            }
+            EOS
         end
         @@lockers["#{host}:#{user}"].timeout = timeout unless timeout.nil?
         @@lockers["#{host}:#{user}"]

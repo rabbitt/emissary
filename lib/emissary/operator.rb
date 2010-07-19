@@ -184,7 +184,7 @@ module Emissary
         rescue Exception => e
           Emissary.logger.error "AgentThread: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
           rejected message, :requeue => true
-          send message.error(Emissary::Error.new(e))
+          send message.error(Emissary::Error.new(e).message)
         else
           increment_rx_count
         end

@@ -29,10 +29,10 @@ module Emissary
         raise exclusion, 'Cannot instantiate subclass except through parent!' unless __caller__ == :identities
       end
 
-      @instance ||= allocate.instance_eval do
+      @instance ||= allocate.instance_eval(<<-EOS, __FILE__, __LINE__)
         load_identities if self.instance_of? ::Emissary::Identity
         self
-      end
+      EOS
     end
 
     # Delegation Factory - Uses registered high priority subclasses 
@@ -84,6 +84,11 @@ module Emissary
       (self.registry[priority] ||= [])  << name
     end
 
+    def self.exclude names
+      @@exclusions ||= []
+      @@exclusions |= (names.is_a?(String) ? names.split(/\s*,\s*/) : names.to_a.collect { |n| n.to_s.to_sym })
+    end
+
     # Exclude an identity type when delegating identity method calls
     #
     def self.exclusions
@@ -109,12 +114,12 @@ module Emissary
     #
     def load_identities
       return unless not !!loaded?
-      
+
       Dir[INTERNAL_IDENTITY_GLOB, EXTERNAL_IDENTITY_GLOB].reject do |id|
         self.class.exclusions.include?("/#{id.to_s.downcase}.rb")
       end.each do |file|
         ::Emissary.logger.info "Loading Identity: #{file}"
-        load file
+        require File.expand_path(file)
       end
 
       @loaded = true
@@ -125,11 +130,9 @@ module Emissary
     #
     def identities
       @identities ||= begin
-        valid_identities = self.class.registry.reverse.flatten.reject do |id|
+        self.class.registry.reverse.flatten.reject do |id|
           id.nil? || self.class.exclusions.include?(id)
-        end
-        
-        valid_identities.inject([]) do |a,id|
+        end.inject([]) do |a,id|
           a << [ id.to_s, ::Emissary.klass_const("Emissary::Identity::#{id.to_s.capitalize}").new ]; a
         end
       end
@@ -138,12 +141,9 @@ module Emissary
   
 end
 
-
-if File.expand_path(__FILE__) == File.expand_path($0)
+if __FILE__ == $0
   puts "-----> Name: " + (Emissary.identity.name rescue 'Could not acquire name')
   puts "-----> P IP: " + (Emissary.identity.public_ip rescue 'Could not acquire public ip')
   puts "-----> L IP: " + (Emissary.identity.local_ip rescue 'Could not acquire local_ip')
-  puts "-----> Name: " + (Emissary.identity.name rescue 'Could not acquire name')
-  puts "-----> P IP: " + (Emissary.identity.public_ip rescue 'Could not acquire public ip')
-  puts "-----> L IP: " + (Emissary.identity.local_ip rescue 'Could not acquire local_ip')
+  puts "-- Identity: " + (Emissary.identity.to_s rescue 'identity not set...')
 end

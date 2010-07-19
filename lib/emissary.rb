@@ -181,9 +181,8 @@ module Emissary
         end
       end
     rescue Exception => e
-      e = Emissary::Error.new(e)
       Emissary.logger.error "DispatchError: #{e.message}"
-      message = message.error(e)
+      message = message.error(Emissary::Error.new(e).message)
       agent_type = 'Emissary::Agent::Error'
     end
 

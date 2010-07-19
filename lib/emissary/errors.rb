@@ -6,7 +6,7 @@ module Emissary
     attr_reader :origin
 
     def self.new(*args) #:nodoc:
-      allocate.instance_eval do
+      allocate.instance_eval(<<-EOS, __FILE__, __LINE__)
         alias :original_instance_of? :instance_of?
         alias :original_kind_of? :kind_of?
   
@@ -19,55 +19,68 @@ module Emissary
         end
 
         # Call a superclass's #initialize if it has one
-        initialize(args[1] || '')
+        initialize(*args)
 
         self
-      end
+      EOS
     end
 
     def initialize(origin = Exception, message = '')
       
-      if origin.kind_of? Exception
-        @origin = origin
-      else
-        if origin.kind_of? Class
-          @origin = origin.new
+      case origin
+        when Exception
+          @origin = origin
+        when Class
+          @origin = origin.new message
         else
-          @origin = Exception.new 
-        end
+          @origin = Exception.new message
       end
 
       super message
     end
 
-    def message(include_trace = true)
-      _class   = origin.class
-      _message = "#{_class}: " << (origin.kind_of?(Emissary::Error) ? origin.message(false) : origin.message)
-      _trace   = ((include_trace ? "\n\t" << trace.join("\n\t") : '')  rescue '')
-      "#{_message} #{_trace}"
+    def origin_backtrace
+      origin.backtrace
+    end
+
+    def origin_message
+      origin.message
     end
     
-    def trace
-      (self.backtrace || []) + ((origin.respond_to?(:trace) ? origin.trace : origin.backtrace) || [])
+    def message
+      "#{super}\n\t#{self.backtrace.join("\n\t")}\n" +
+      "Origin: #{origin.class}: #{origin_message}\n\t#{origin_backtrace.join("\n\t")}"
     end
   end
 end
 
 if __FILE__ == $0
+  class Emissary::TrackingError < Emissary::Error; end
+  class Emissary::NetworkEncapsulatedError < Emissary::Error; end
+  def a() raise ArgumentError, 'testing'; end
+  def b() a; end
+  def c() b; end
+  def d() c; end
+  def test() d; end
+
   begin
     begin
       begin
-        raise Emissary::Error.new(ArgumentError, "testing")
+        begin
+          test
+        rescue Exception => e
+          raise Emissary::Error.new e, 'general error'
+        end
       rescue Emissary::Error => e
-        puts "1: " << e.message
-        raise Emissary::TrackingError.new(e)
+        puts "----------------- 1 -----------------\n#{e.message}"
+        raise Emissary::TrackingError.new(e, 'testing tracking')
       end
     rescue Emissary::Error => e
-      puts "2: " << e.message
-      raise Emissary::NetworkEncapsulatedError.new(e)
+      puts "----------------- 2 -----------------\n#{e.message}"
+      raise Emissary::NetworkEncapsulatedError.new(e, 'testing network encapsulated')
     end
   rescue Emissary::Error => e
-    puts "3: " << e.message
+    puts "----------------- 3 -----------------\n#{e.message}"
   end
   
   [ Exception, ArgumentError, Emissary::Error, Emissary::TrackingError, Emissary::NetworkEncapsulatedError].each do |k|

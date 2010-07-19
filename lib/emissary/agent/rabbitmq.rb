@@ -183,7 +183,12 @@ module Emissary
     end
     
     def change_password(user, pass)
-      !!rabbitmqctl(:change_password, user, pass)
+      begin
+        !!rabbitmqctl(:change_password, user, pass)
+      rescue CommandExecutionError => e
+        return false if e.message.include? 'no_such_user'
+        raise e 
+      end
     end
     
     def delete_user(user)
