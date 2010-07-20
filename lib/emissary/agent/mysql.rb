@@ -103,7 +103,7 @@ module Emissary
   
     
     def connection
-      @connection ||= Mysql.real_connect(@host, @user, @password)
+      @connection ||= ::Mysql.real_connect(@host, @user, @password)
     end
   
     def disconnect
