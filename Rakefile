@@ -10,7 +10,8 @@ def manifest_files
     File.join(base_path, 'lib'),
     File.join(base_path, 'etc'),
     File.join(base_path, 'bin'),
-    File.join(base_path, 'VERSION.yml')
+    File.join(base_path, 'VERSION.yml'),
+    File.join(base_path, 'LICENSE'),
   ]
   
   Find.find(*search_paths) do |path|
@@ -23,11 +24,16 @@ def manifest_files
   manifest_files
 end
 
+GEM         = 'emissary'
+GEM_VERSION = YAML.load(File.read('VERSION.yml')).values.join('.').to_s
+AUTHOR      = 'Carl P. Corliss'
+EMAIL       = 'carl.corliss@nytimes.com'
+
 spec = Gem::Specification.new do |s|
-  s.name = "emissary"
-  s.version = YAML.load(File.read('VERSION.yml')).values.join('.').to_s
-  s.author = "Carl P. Corliss"
-  s.email = "carl.corliss@nytimes.com"
+  s.name = GEM 
+  s.version = GEM_VERSION
+  s.author = AUTHOR
+  s.email = EMAIL
   s.homepage = "http://www.nytimes.com/"
   s.platform = Gem::Platform::RUBY
   s.summary = "EventMachine/AMQP based event handling client"
@@ -59,6 +65,30 @@ end
 
 require 'rake/clean'
 CLEAN.include('pkg')
+
+
+desc "install the gem locally"
+task :install => [:package] do
+  sh %{sudo gem install pkg/#{GEM}-#{GEM_VERSION}}
+end
+
+namespace :spec do
+  desc "create a gemspec file"
+  task :create do
+    File.open("#{GEM}.gemspec", 'w') do |file|
+      file.puts spec.to_ruby
+    end
+  end
+end
+
+namespace :manifest do
+  desc "Rebuild Manifest file"
+  task :rebuild do
+    File.open('Manifest.txt', 'w') do |file|
+      file.puts manifest_files.join("\n")
+    end
+  end
+end
 
 rake_tasks_glob = File.join(File.dirname(File.expand_path(__FILE__)), 'tasks', '*.rake')
 Dir[rake_tasks_glob].sort.each do |ext| 
