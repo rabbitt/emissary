@@ -52,14 +52,15 @@ module Emissary
       
       def post_init
         uri = ::URI.parse @config[:uri]
-        
+        ssl = (uri.scheme.to_sym == :amqps)
+
         @connect_details = {
           :host  => uri.host,
-          :ssl   => uri.scheme.to_sym == :amqps ? true : false,
+          :ssl   => ssl,
           :user  => ::URI.decode(uri.user)      || 'guest',
           :pass  => ::URI.decode(uri.password)  || 'guest',
-          :vhost => uri.path     || '/',
-          :port  => uri.port     || 5672,
+          :vhost => uri.path.empty? || '/',
+          :port  => uri.port || (ssl ? 5671 : 5672),
           :logging => @config[:debug] || false,
         }
         
