@@ -347,7 +347,6 @@ module Emissary
       while not @shutting_down do
         @operators.each do |name,operator|
           unless not can_startup? operator
-            Emissary::Logger.instance Emissary::Logger::LOG_SYSLOG, Emissary::Logger::NOTICE
             Emissary.logger.notice "Starting up Operator: #{name}"
             
             server_data = {
