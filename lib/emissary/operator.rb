@@ -61,7 +61,6 @@ module Emissary
     
     DEFAULT_STATUS_INTERVAL = 60
     DEFAULT_MAX_WORKERS     = 50
-    THREAD_WORKER_TTL       = 60
     
     attr_reader   :config, :shutting_down, :signature 
 
@@ -89,9 +88,9 @@ module Emissary
     def initialize(config, *args)
       @config    = config
       @workers   = DEFAULT_MAX_WORKERS #args[0][:max_workers] || DEFAULT_MAX_WORKERS rescue DEFAULT_MAX_WORKERS
-      @agents    = WorkQueue.new(@workers, nil, THREAD_WORKER_TTL)
-      @publisher = WorkQueue.new(@workers, nil, THREAD_WORKER_TTL)
-      @stats     = WorkQueue.new(1, nil, THREAD_WORKER_TTL)
+      @agents    = WorkQueue.new(@workers)
+      @publisher = WorkQueue.new(@workers)
+      @stats     = WorkQueue.new(1)
 
       @rx_count  = 0
       @tx_count  = 0
