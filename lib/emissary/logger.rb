@@ -81,6 +81,14 @@ module Emissary
       return INFO
     end
     
+    def level_to_sym
+      CONSTANT_ID_MAP[@level].first
+    end
+    
+    def level_to_s
+      level_to_sym.to_s.upcase
+    end
+    
 		def loggable?(log_level)
 			log_level <= normalize(@level)
 		end
@@ -111,7 +119,7 @@ module Emissary
 			self
 		end
 
-		for log_level in [:emergency, :emerg, :alert, :critical, :crit, :fatal, :error, :err, :warning, :warn, :notice, :info, :debug]
+		CONSTANT_ID_MAP.values.flatten.each do |log_level|
 			class_eval %(
 				def #{log_level}(message, *args)
 					log(#{'::Emissary::Logger::' + log_level.to_s.upcase}, message, *args)
