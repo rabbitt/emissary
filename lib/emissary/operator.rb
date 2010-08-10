@@ -88,9 +88,9 @@ module Emissary
     def initialize(config, *args)
       @config    = config
       @workers   = DEFAULT_MAX_WORKERS #args[0][:max_workers] || DEFAULT_MAX_WORKERS rescue DEFAULT_MAX_WORKERS
-      @agents    = WorkQueue.new(@workers)
-      @publisher = WorkQueue.new(@workers)
-      @stats     = WorkQueue.new(1)
+      @agents    = WorkQueue.new(@workers, nil, nil)
+      @publisher = WorkQueue.new(@workers, nil, nil)
+      @stats     = WorkQueue.new(1, nil, nil)
 
       @rx_count  = 0
       @tx_count  = 0
