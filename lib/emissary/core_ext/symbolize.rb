@@ -1,22 +1,14 @@
-#   Copyright 2010 The New York Times
-#
-#   Licensed under the Apache License, Version 2.0 (the "License");
-#   you may not use this file except in compliance with the License.
-#   You may obtain a copy of the License at
-#
-#       http://www.apache.org/licenses/LICENSE-2.0
-#
-#   Unless required by applicable law or agreed to in writing, software
-#   distributed under the License is distributed on an "AS IS" BASIS,
-#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
-#   limitations under the License.
-#
-#
 class Hash
    def symbolize
     inject({}) do |hash,(key,value)|
-      hash[(key.to_sym rescue key) || key] = (value.kind_of?(Hash) ? value.symbolize : value)
+      hash[(key.to_sym rescue key) || key] = case value
+        when Hash
+          value.symbolize
+        when Array
+          value.collect { |v| v.symbolize }
+        else
+          value
+      end
       hash
     end
   end
