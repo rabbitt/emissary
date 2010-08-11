@@ -22,8 +22,9 @@ require 'daemons'
 
 module Emissary
   
-  # A lot of the ServerController/Daemon stuff has been borrowed
-  # from Servolux::Daemon and Servolux::Server
+  # Some of the ServerController/Daemon stuff has been borrowed
+  # from Servolux::Daemon and Servolux::Server, so:
+  # Thanks to Tim Pease for those parts that are gleaned from Servolux
   module ServerController
     
     SIGNALS = %w[HUP INT TERM USR1 USR2 EXIT] & Signal.list.keys
