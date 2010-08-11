@@ -19,11 +19,22 @@ require 'emissary/errors'
 require 'monitor'
 require 'work_queue'
 
+# ### MONKEY PATCH AHEAD: YOU'VE BEEN WARNED!! ###
+# WorkQueueu oddly loses threads in some weird situation I have figured out yet
+# while using Mutex - switching to Monitor seems to fix it.
+class WorkQueue
+  alias :original_initialize :initialize
+  def initialize *args
+    original_initialize(*args)
+    @threads_lock = Monitor.new if @threads_lock.instance_of? Mutex
+  end
+end
+
 module Emissary
   module OperatorStatistics
     RX_COUNT_MUTEX = Mutex.new
     TX_COUNT_MUTEX = Mutex.new
-
+    
     attr_reader :rx_count, :tx_count
     def increment_tx_count
       TX_COUNT_MUTEX.synchronize {
@@ -61,6 +72,7 @@ module Emissary
     
     DEFAULT_STATUS_INTERVAL = 60
     DEFAULT_MAX_WORKERS     = 50
+    MAX_WORKER_TTL          = 60
     
     attr_reader   :config, :shutting_down, :signature 
 
@@ -88,9 +100,9 @@ module Emissary
     def initialize(config, *args)
       @config    = config
       @workers   = DEFAULT_MAX_WORKERS #args[0][:max_workers] || DEFAULT_MAX_WORKERS rescue DEFAULT_MAX_WORKERS
-      @agents    = WorkQueue.new(@workers, nil, nil)
-      @publisher = WorkQueue.new(@workers, nil, nil)
-      @stats     = WorkQueue.new(1, nil, nil)
+      @agents    = WorkQueue.new(@workers, nil, MAX_WORKER_TTL)
+      @publisher = WorkQueue.new(@workers, nil, MAX_WORKER_TTL)
+      @stats     = WorkQueue.new(1, nil, MAX_WORKER_TTL)
 
       @rx_count  = 0
       @tx_count  = 0
@@ -145,15 +157,15 @@ module Emissary
       Emissary.logger.notice "Shutting down..."
       send_shutdown_notification
 
-      Emissary.logger.info "Shutting down publisher workqueue..."
-      @publisher.join
-
-      Emissary.logger.info "Shutting down agent workqueue..."
-      @agents.join
-
       Emissary.logger.info "Cancelling periodic timer for statistics gatherer..."
       @timer.cancel
       
+      Emissary.logger.info "Shutting down agent workqueue..."
+      @agents.join
+
+      Emissary.logger.info "Shutting down publisher workqueue..."
+      @publisher.join
+
       Emissary.logger.info "Disconnecting..."
       disconnect
     end
