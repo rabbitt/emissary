@@ -143,7 +143,7 @@ module Emissary
           Emissary.logger.debug "Message Originator: #{msg.originator} - Recipient: #{msg.recipient}"
           @exchanges[msg.exchange_type].publish msg.stamp_sent!.encode, :routing_key => msg.routing_key
         rescue NoMethodError
-          raise InvalidExchange, "publish request on invalid exchange '#{msg.routing_type}' with routing key '#{msg.routing_key}'"
+          raise InvalidExchange, "publish request on invalid exchange '#{msg.exchange_type}' with routing key '#{msg.routing_key}'"
         end
       end
       
