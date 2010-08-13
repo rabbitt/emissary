@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary'
-
 require 'net/http'
 require 'socket'
 
@@ -35,17 +33,24 @@ module Emissary
       @identities = nil
     end
 
+    def self.instance
+      @@instance ||= self.new
+    end
+    
     def self.new(*largs)
       # prevent subclasses from being instantiated directly, except through
       # the identities() method of this parent class. This class is just a
       # simple method factory and the children shouldn't need to be accessed
       # except through the interface provided here.
-      if self != Emissary::Identity 
-        raise exclusion, 'Cannot instantiate subclass except through parent!' unless __caller__ == :identities
+      if self == Emissary::Identity
+        raise Exception, "Cannot instantiate singleton class directly - use #{self.name}#instance" unless __caller__ == :instance
+      else
+        klass = self.name.split(/::/)[0..-2].join '::'; subklass = self.name.split(/::/).last
+        raise Exception, "Cannot instantiate '#{klass}' subclass '#{subklass}' directly" unless __caller__ == :identities
       end
 
-      @instance ||= allocate.instance_eval(<<-EOS, __FILE__, __LINE__)
-        load_identities if self.instance_of? ::Emissary::Identity
+      allocate.instance_eval(<<-EOS, __FILE__, __LINE__)
+        load_identities unless self.class != Emissary::Identity
         self
       EOS
     end
@@ -56,13 +61,16 @@ module Emissary
     # in the higher priority subclass
     #
     def method_missing name, *args
+      # don't perform lookups on subclasses
+      super name, *args unless self.class == Emissary::Identity
+      
       name = name.to_sym
-      if not (@methods||={}).has_key? name
+      unless (@methods||={}).has_key? name
         method_delegate = value = nil
 
         # loop through each possible identity, higher priority identities
         # first (0 == low, > 0 == higher). 
-        identities.each { |id,object|
+        identities.each do |id,object|
           value = nil
           if object.respond_to?(name)
             method_delegate = catch(:pass) {
@@ -71,7 +79,7 @@ module Emissary
             }
             break unless method_delegate.nil?
           end
-        }
+        end
         
         # if we've gone through all the possible delegates, then pass it
         # up to the superclass (in this case, Object)
@@ -80,7 +88,6 @@ module Emissary
         end
         
         @methods[name] = method_delegate
-
         return value
       end
  
@@ -114,9 +121,22 @@ module Emissary
     def to_s
       s = ''
       s << '#<%s:0x%x ' % [ self.class, self.__id__ * 2]
-      s << "@methods=#{Hash[@methods.collect { |k,v| [k,  Hash[@identities].invert[@methods[k]].to_sym ]}].inspect rescue {}.inspect} "
-      s << "@identities=#{@identities.collect { |id,obj| id.to_sym }.inspect rescue [].inspect} "
+      s << to_h.inject([]) { |a,(k,v)| a << %Q|@#{k}="#{v}"| }.join(', ')
       s << '>'
+    end
+
+    # Retrieve a list of all the available identifers through reflection of the subclasses
+    #
+    def identifiers
+      identities.inject([]) do |list,(id,object)|
+        list |= object.public_methods - object.class.superclass.public_methods - self.public_methods;  list
+      end.sort.collect { |id| id.to_sym }
+    end
+
+    # Retreive a hash of all identifiers and their values
+    #
+    def to_h
+      Hash[(identifiers).zip(identifiers.collect { |identifier| self.send(identifier) })]
     end
 
     private
@@ -128,7 +148,7 @@ module Emissary
     # Loads all available identities included with this gem
     #
     def load_identities
-      return unless not !!loaded?
+      return unless not !!loaded? 
 
       Dir[INTERNAL_IDENTITY_GLOB, EXTERNAL_IDENTITY_GLOB].reject do |id|
         self.class.exclusions.include?("/#{id.to_s.downcase}.rb")
@@ -144,7 +164,7 @@ module Emissary
     # and then ordering them highest priority (> 0) to lowest priority (== 0)
     #
     def identities
-      @identities ||= begin
+      @@identities ||= begin
         self.class.registry.reverse.flatten.reject do |id|
           id.nil? || self.class.exclusions.include?(id)
         end.inject([]) do |a,id|
@@ -153,7 +173,6 @@ module Emissary
       end
     end
   end
-  
 end
 
 if __FILE__ == $0

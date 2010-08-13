@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/identity'
-
 module Emissary
   class Identity::Ec2 < Identity
     register :ec2, :priority => 25

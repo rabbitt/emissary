@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/identity'
-
 module Emissary
   class Identity::Unix < Identity
     # defaults to priority 0 (which means, it's the last option if nothing else takes it)
