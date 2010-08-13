@@ -5,7 +5,7 @@ class Hash
         when Hash
           value.symbolize
         when Array
-          value.collect { |v| v.symbolize }
+          value.collect { |v| v.symbolize rescue v }
         else
           value
       end
