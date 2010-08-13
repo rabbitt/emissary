@@ -13,24 +13,21 @@
 #   limitations under the License.
 #
 #
-require 'emissary'
-require 'emissary/errors'
-
 require 'monitor'
 require 'work_queue'
 
-# ### MONKEY PATCH AHEAD: YOU'VE BEEN WARNED!! ###
-# WorkQueueu oddly loses threads in some weird situation I have figured out yet
-# while using Mutex - switching to Monitor seems to fix it.
-class WorkQueue
-  alias :original_initialize :initialize
-  def initialize *args
-    original_initialize(*args)
-    @threads_lock = Monitor.new if @threads_lock.instance_of? Mutex
-  end
-end
-
 module Emissary
+  # ### MONKEY PATCH AHEAD: YOU'VE BEEN WARNED!! ###
+  # WorkQueueu oddly loses threads in some weird situation I have figured out yet
+  # while using Mutex - switching to Monitor seems to fix it.
+  # 
+  class WorkQueue < ::WorkQueue
+    def initialize *args
+      super(*args)
+      @threads_lock = Monitor.new if @threads_lock.instance_of? Mutex
+    end
+  end
+
   module OperatorStatistics
     RX_COUNT_MUTEX = Mutex.new
     TX_COUNT_MUTEX = Mutex.new
@@ -172,7 +169,7 @@ module Emissary
 
     def enabled? what
       unless [ :startup, :shutdown, :stats ].include? what.to_sym
-        Emissary.logger.debug "Testing '#{what}' - it's diabled. Not a valid option."
+        Emissary.logger.debug "Testing '#{what}' - it's disabled. Not a valid option."
         return false
       end
       
@@ -199,8 +196,6 @@ module Emissary
     end
     
     def receive message
-      message = (message.kind_of?(Emissary::Message) ? message : Emissary::Message.decode(message))
-
       @agents.enqueue_b {
         begin
           Emissary.logger.debug " ---> [DISPATCHER] Dispatching new message ... "

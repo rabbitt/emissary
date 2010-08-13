@@ -14,7 +14,6 @@
 #
 #
 require 'emissary/operator'
-
 require 'mq'
 require 'uri'
 
