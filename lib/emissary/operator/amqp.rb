@@ -57,9 +57,9 @@ module Emissary
         @connect_details = {
           :host  => uri.host,
           :ssl   => ssl,
-          :user  => ::URI.decode(uri.user)      || 'guest',
-          :pass  => ::URI.decode(uri.password)  || 'guest',
-          :vhost => uri.path.empty? || '/',
+          :user  => (::URI.decode(uri.user) rescue nil)     || 'guest',
+          :pass  => (::URI.decode(uri.password) rescue nil) || 'guest',
+          :vhost => (! uri.path.empty? ? uri.path : '/nimbul'),
           :port  => uri.port || (ssl ? 5671 : 5672),
           :logging => @config[:debug] || false,
         }
