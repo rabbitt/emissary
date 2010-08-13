@@ -13,9 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary'
-require 'emissary/message'
-
 require 'emissary/servolux'
 require 'eventmachine'
 

@@ -42,9 +42,6 @@ require 'fileutils'
 require 'optparse'
 
 require 'emissary'
-require 'emissary/daemon'
-require 'emissary/config'
-require 'emissary/logger'
 
 class EmissaryClient
 	VERSION = '$Revision: 18411 $'.match(/[0-9]+/)[0]

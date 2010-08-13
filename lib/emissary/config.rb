@@ -15,9 +15,6 @@
 #
 require 'inifile'
 
-require 'emissary'
-require 'emissary/errors'
-
 #
 # This class represents the INI file and can be used to parse INI files.
 # Derived from IniFile gem, found on http://rubyforge.org/projects/inifile/

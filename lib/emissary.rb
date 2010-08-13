@@ -25,11 +25,12 @@ rescue LoadError
 end
 
 module Emissary
-
   # :stopdoc:
-  LIBPATH = File.expand_path(File.dirname(__FILE__)) + File::SEPARATOR
+  LIBPATH = File.expand_path(File.dirname(File.expand_path(__FILE__))) + File::SEPARATOR
   PATH = File.dirname(LIBPATH) + File::SEPARATOR
   VERSION = ::YAML.load(File.read(File.join(PATH, 'VERSION.yml'))).values.join '.'
+
+  $:.unshift LIBPATH
 
   EXTERNALS_BASE      = File.join(File::SEPARATOR, 'opt')
   EXTERNAL_IDENTITIES = File.join(EXTERNALS_BASE, 'emissary', 'identities')

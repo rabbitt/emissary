@@ -13,11 +13,8 @@
 #   limitations under the License.
 #
 #
-require 'emissary'
 require 'emissary/servolux'
 require 'emissary/server'
-require 'emissary/config'
-
 require 'daemons'
 
 module Emissary

@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary'
-
 module Emissary
   class Agent
     attr_reader :name, :message, :method, :config, :operator

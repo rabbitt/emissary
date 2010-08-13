@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary'
-
 module Emissary
   class Error < StandardError
 
