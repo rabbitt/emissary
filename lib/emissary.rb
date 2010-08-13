@@ -216,7 +216,7 @@ module Emissary
   end
 end # module Emissary
 
-$:.unshift Emissary.LIBPATH
+$:.unshift Emissary::LIBPATH
 
 [ :errors, :logger, :operator, :agent, :identity, :message, :config ].each do |sublib|
   require Emissary.sublib_path sublib.to_s
