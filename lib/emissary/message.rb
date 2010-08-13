@@ -13,7 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary'
 require 'uuid'
 require 'bert'
 
@@ -143,13 +142,17 @@ module Emissary
     end
 
     def stamp_sent!
-      time[:sent] = Time.now.to_i
+      time[:sent] = Time.now.to_f
       self
     end
     
     def stamp_received!
-      time[:received] = Time.now.to_i
+      time[:received] = Time.now.to_f
       self
+    end
+    
+    def trip_time
+      (time[:sent].to_f - time[:received].to_f rescue 0.0) || 0.0
     end
     
     def response

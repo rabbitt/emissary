@@ -14,14 +14,15 @@
 #
 #
 require 'rubygems'
-
 require 'uuid'
 require 'digest/md5'
-require 'thread'
 require 'yaml'
-require 'fastthread' rescue nil
 
-require 'emissary/errors'
+begin
+  require 'thread'
+  require 'fastthread'
+rescue LoadError
+end
 
 module Emissary
 

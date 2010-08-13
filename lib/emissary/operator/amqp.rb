@@ -13,7 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/operator'
 require 'mq'
 require 'uri'
 
