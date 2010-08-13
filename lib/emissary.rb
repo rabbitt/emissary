@@ -30,8 +30,6 @@ module Emissary
   PATH = File.dirname(LIBPATH) + File::SEPARATOR
   VERSION = ::YAML.load(File.read(File.join(PATH, 'VERSION.yml'))).values.join '.'
 
-  $:.unshift LIBPATH
-
   EXTERNALS_BASE      = File.join(File::SEPARATOR, 'opt')
   EXTERNAL_IDENTITIES = File.join(EXTERNALS_BASE, 'emissary', 'identities')
   EXTERNAL_AGENTS     = File.join(EXTERNALS_BASE, 'emissary', 'agents')
@@ -218,6 +216,8 @@ module Emissary
   end
 end # module Emissary
 
-[ :errors, :logger, :operator, :agent, :identity, :message ].each do |sublib|
+$:.unshift Emissary.LIBPATH
+
+[ :errors, :logger, :operator, :agent, :identity, :message, :config ].each do |sublib|
   require Emissary.sublib_path sublib.to_s
 end
