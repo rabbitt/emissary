@@ -128,10 +128,6 @@ private
         exit!(0) if fork
         $0 = name unless name.nil?
         Dir.chdir '/'
-        File.umask 0000
-        STDIN.reopen  '/dev/null' 
-        STDOUT.reopen '/dev/null', 'a' 
-        STDERR.reopen '/dev/null', 'a'
         ::Emissary.logger.debug "SelfUpdate: Detached and running update command block now..."
         yield
         ::Emissary.logger.debug "SelfUpdate: Finished running update command block - exiting..."
