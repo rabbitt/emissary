@@ -66,7 +66,7 @@ module Emissary
     end
     
     def installable? version = :any
-      !versions(:any).empty? && !installed?(version) && @version < normalize_version(version)
+      !versions(:any).empty? && !installed?(version) && normalize_version(version) > @version 
     end
     
     def installed? version = :any
