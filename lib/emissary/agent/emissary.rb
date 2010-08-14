@@ -49,27 +49,30 @@ module Emissary
     end
 
     def selfupdate version = :latest, source_url = :default
-      with_detached_process do 
-        require 'emissary/agent/gem'
-        begin
-          ::Emissary::Gem.new('emissary').update(version, source_url)
-        rescue ::Gem::InstallError, ::Gem::GemNotFoundException => e
-          response = message.response
-          response.status_type = :error
-          response.status_note = e.message
-          return response
-        else
-          with_detached_process do 
-            %x{
-                emissary stop
-                # now make sure that it is stopped after giving it 5 seconds to shutdown
-                sleep 5 
-                ps uxa | grep -v grep | grep '(emissary|emop_)' | awk '{ print $2 }' | xargs kill -9
-                emissary start -d
-              }
-          end
-          throw :skip_implicit_response
+      begin
+        ::Emissary.logger.debug "Emissary SelfUpdate to version '#{version.to_s}' from source '#{source_url.to_s}' requested."
+        ::Emissary::GemHelper.new('emissary').update(version, source_url)
+        ::Emissary.logger.debug "done with update - restarting."
+      rescue ::Gem::InstallError, ::Gem::GemNotFoundException => e
+        ::Emissary.logger.error "Emissary selfupdate failed with reason: #{e.message}"
+        response = message.response
+        response.status_type = :error
+        response.status_note = e.message
+        return response
+      else
+        ::Emissary.logger.debug "SelfUpdate: About to detach and run commands"
+        with_detached_process('emissary-selfupdate') do
+          %x{
+            emissary stop;
+            sleep 2; 
+            ps uxa | grep -v grep | grep '(emissary|emop_)' | awk '{ print $2 }' | xargs kill -9;
+            sleep 1;
+            source /etc/cloudrc;
+            emissary start -d;
+          }
         end
+        ::Emissary.logger.debug "SelfUpdate: Child detached"
+        throw :skip_implicit_response
       end
     end
     
@@ -105,22 +108,27 @@ module Emissary
 
 private
 
-    def with_detached_process
+    def with_detached_process(name = nil)
       raise Exception, 'Block missing for with_detached_process call' unless block_given?
-      
+
       # completely seperate from our parent process
       pid = Kernel.fork do
         Process.setsid
-        exit!(0) if fork 
+        exit!(0) if fork
+        $0 = name unless name.nil?
         Dir.chdir '/'
         File.umask 0000
         STDIN.reopen  '/dev/null' 
         STDOUT.reopen '/dev/null', 'a' 
         STDERR.reopen '/dev/null', 'a'
+        ::Emissary.logger.debug "SelfUpdate: Detached and running update command block now..."
         yield
+        ::Emissary.logger.debug "SelfUpdate: Finished running update command block - exiting..."
+        exit!(0)
       end
 
-      #don't worry about      
+      ::Emissary.logger.debug "SelfUpdate: Detaching child process now."
+      #don't worry about the child anymore - it's on it's own
       Process.detach(pid)
     end
   end

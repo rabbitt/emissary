@@ -18,7 +18,7 @@ require 'rubygems/dependency_installer'
 require 'rubygems/uninstaller'
 
 module Emissary
-  class Gem
+  class GemHelper
     attr_reader :name, :version
     
     def initialize(name)
