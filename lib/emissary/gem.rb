@@ -86,9 +86,9 @@ module Emissary
       list = Gem::SpecFetcher.fetcher.find_matching(dependency, others).map do |spec, source_uri|
         _, version = spec
         [version, source_uri]
-      end.sort { |a,b| a[0] <=> b[0] }
+      end.sort { |a,b| a[0] <=> b[0] }.flatten
       
-      which != :installed ? list : list.select { |v| installed? v[0]  } 
+      which != :installed ? list: list.select { |v| installed? v[0]  } 
     end
   
     def dependents version = :current

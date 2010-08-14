@@ -50,9 +50,20 @@ module Emissary
 
     def selfupdate version = :latest, source_url = :default
       begin
-        ::Emissary.logger.debug "Emissary SelfUpdate to version '#{version.to_s}' from source '#{source_url.to_s}' requested."
-        ::Emissary::GemHelper.new('emissary').update(version, source_url)
-        ::Emissary.logger.debug "done with update - restarting."
+        unless not ::Emissary::GemHelper.new('emissary').installable? version
+          ::Emissary.logger.debug "Emissary SelfUpdate to version '#{version.to_s}' from source '#{source_url.to_s}' requested."
+          
+          ::Emissary::GemHelper.new('emissary').update(version, source_url)
+          new_version = ::Emissary::GemHelper.versions version 
+          
+          ::Emissary.logger.debug "Emissary gem updated from '#{::Emissary.version}' to '#{new_version}'"
+        else
+          message = "Emissary selfupdate unable to update to requested version '#{version}' using source '#{source_url}'"
+          ::Emissary.logger.warn message
+          response = message.response
+          response.status_note = message
+          return response
+        end
       rescue ::Gem::InstallError, ::Gem::GemNotFoundException => e
         ::Emissary.logger.error "Emissary selfupdate failed with reason: #{e.message}"
         response = message.response
