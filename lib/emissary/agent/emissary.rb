@@ -59,12 +59,15 @@ module Emissary
           response.status_note = e.message
           return response
         else
-          %x{
-            /etc/init.d/emissary stop
-            # now make sure that it is stopped
-            ps uxa | grep '(emissary|emop_)' | awk '{ print $2 }' | xargs kill -9
-            /etc/init.d/emissary start
-          }
+          with_detached_process do 
+            %x{
+                emissary stop
+                # now make sure that it is stopped after giving it 5 seconds to shutdown
+                sleep 5 
+                ps uxa | grep -v grep | grep '(emissary|emop_)' | awk '{ print $2 }' | xargs kill -9
+                emissary start -d
+              }
+          end
           throw :skip_implicit_response
         end
       end
@@ -90,7 +93,12 @@ module Emissary
     
     def shutdown
       message.recipient = config[:shutdown]
-      message.args = [ config[:agents][:emissary][:server_id] ]
+      message.args = [
+        ::Emissary.identity.server_id,
+        ::Emissary.identity.cluster_id,
+        ::Emissary.identity.account_id,
+        ::Emissary.identity.instance_id
+      ]
       ::Emissary.logger.notice "Sending Shutdown message with args: #{message.args.inspect}"
       message
     end
@@ -103,17 +111,17 @@ private
       # completely seperate from our parent process
       pid = Kernel.fork do
         Process.setsid
-        exit!(0) if fork # prevent process from acquiring a controlling terminal
+        exit!(0) if fork 
         Dir.chdir '/'
         File.umask 0000
-        STDIN.reopen  '/dev/null'       # Free file descriptors and
-        STDOUT.reopen '/dev/null', 'a' # point them somewhere sensible.
+        STDIN.reopen  '/dev/null' 
+        STDOUT.reopen '/dev/null', 'a' 
         STDERR.reopen '/dev/null', 'a'
         yield
       end
-      
+
+      #don't worry about      
       Process.detach(pid)
     end
-    
   end
 end
