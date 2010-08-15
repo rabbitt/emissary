@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/agent'
-require 'emissary/gem'
 require 'tempfile'
 require 'fileutils'
 
@@ -50,12 +48,9 @@ module Emissary
 
     def selfupdate version = :latest, source_url = :default
       begin
-        unless not ::Emissary::GemHelper.new('emissary').installable? version
+        unless not (emissary_gem = ::Emissary::GemHelper.new('emissary')).installable? version
           ::Emissary.logger.debug "Emissary SelfUpdate to version '#{version.to_s}' from source '#{source_url.to_s}' requested."
-          
-          ::Emissary::GemHelper.new('emissary').update(version, source_url)
-          new_version = ::Emissary::GemHelper.versions version 
-          
+          new_version = emissary_gem.update(version, source_url)
           ::Emissary.logger.debug "Emissary gem updated from '#{::Emissary.version}' to '#{new_version}'"
         else
           message = "Emissary selfupdate unable to update to requested version '#{version}' using source '#{source_url}'"
@@ -66,10 +61,7 @@ module Emissary
         end
       rescue ::Gem::InstallError, ::Gem::GemNotFoundException => e
         ::Emissary.logger.error "Emissary selfupdate failed with reason: #{e.message}"
-        response = message.response
-        response.status_type = :error
-        response.status_note = e.message
-        return response
+        return message.error(e)
       else
         ::Emissary.logger.debug "SelfUpdate: About to detach and run commands"
         with_detached_process('emissary-selfupdate') do

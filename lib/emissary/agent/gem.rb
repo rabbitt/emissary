@@ -13,9 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/agent'
-require 'emissary/gem'
-
 module Emissary
   class Agent::Gem < Agent
     def valid_methods

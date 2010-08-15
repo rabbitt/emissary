@@ -26,27 +26,32 @@ module Emissary
       @version = current_version
     end
     
-    def normalize_version version
-      case version
+    def version
+      (v = @version.to_s.delete('<>!=~ ').strip).empty? ? 0 : v
+    end
+    
+    def normalize_version value
+      case value
         when Gem::Requirement, Gem::Version
-          version
+          value
         
         when /^(<|<=|=|!=|>|>=|~>)\s*[0-9.]+$/
-          Gem::Requirement.new version
+          Gem::Requirement.new value
+          
         when /^[0-9.]+$/, String, Fixnum
-          Gem::Version.new version
+          Gem::Version.new value
         
         when :current
-          @version || Gem::Version.new('0')
+          Gem::Version.new(self.version)
           
         when :all, :any, :installed, :available
           Gem::Requirement.default
         
         when :newer_than_me, :latest, :newest
-          Gem::Requirement.new "> #{@version || 0}"
+          Gem::Requirement.new "> #{self.version}"
         
         when :older_than_me
-          Gem::Requirement.new "< #{@version || 0}"
+          Gem::Requirement.new "< #{self.version}"
       end
     end
   
@@ -61,7 +66,7 @@ module Emissary
     alias :have_dependents? :is_a_provider?
     alias :has_dependents?  :is_a_provider? 
     
-    def removeable? version = :current, ignore_dependents = false
+    def removable? version = :current, ignore_dependents = false
       installed?(version) && (!!ignore_dependents || !have_dependents?(version))
     end
     
@@ -76,7 +81,7 @@ module Emissary
     def current_version
       return Gem::Version.new(0) unless installed?
       specs = Gem.source_index.search(Gem::Dependency.new(name, normalize_version(:newest)))
-      specs.map { |spec| spec.version }.sort{ |a,b| a <=> b }.reverse.first
+      specs.map { |spec| spec.version }.sort{ |a,b| a <=> b }.first
     end
     
     def versions which = :all
@@ -86,9 +91,9 @@ module Emissary
       list = Gem::SpecFetcher.fetcher.find_matching(dependency, others).map do |spec, source_uri|
         _, version = spec
         [version, source_uri]
-      end.sort { |a,b| a[0] <=> b[0] }
+      end.sort { |a,b| b[0] <=> a[0] }
       
-      which != :installed ? list: list.select { |v| installed? v[0]  } 
+      which != :installed ? list : list.select { |v| installed? v[0]  } 
     end
   
     def dependents version = :current
@@ -115,30 +120,18 @@ module Emissary
       end
           
       raise ArgumentError, "Bad version '#{version.inspect}' - can't install specified version." unless options[:version]
-  
-      # only use the specified source (whether default or user specified)
-      begin
-        original_sources = Gem.sources.dup
-        Gem.sources.replace [source_uri]
-        
+
+      with_gem_source(source_uri) do
         installer = Gem::DependencyInstaller.new options
-    
         installer.install name, options[:version]
-        @version = normalize_version options[:version]
-      ensure
-        Gem.sources.replace original_sources
-        Gem.refresh
+        @version = Gem::Version.new(normalize_version(options[:version]).to_s.delete('<>!=~ '))
       end
-      
-      true
     end
   
     def update version = :latest, source = :default, keep_old = true
       return false unless updateable?
       uninstall(@version, false) unless keep_old
       install version, source 
-  
-      @version = normalize_version version
     end
     
     def uninstall version = :current, ignore_deps = false, remove_execs = false
@@ -159,7 +152,7 @@ module Emissary
       return true if not installed? version 
       raise ArgumentError, "Cannot uninstall version #{version.inspect} - is it installed? [#{options.inspect}]" unless options[:version]
   
-      unless removeable?(version, !!ignore_deps)
+      unless removable?(version, !!ignore_deps)
         msg = ['Refusing to uninstall gem required by other gems:']
         dependents(options[:version]).each do |gem, dep, satlist|
           msg << "    Gem '#{gem.name}-#{gem.version}' depends on '#{dep.name}' (#{dep.requirement})";
@@ -172,6 +165,19 @@ module Emissary
       @version = Gem::Version.new '0'
     end
     alias :remove :uninstall
+
+  private
+  
+    def with_gem_source(source)
+      begin
+        original_sources = Gem.sources.dup
+        Gem.sources.replace [source]
+        return yield
+      ensure
+        Gem.sources.replace original_sources
+        Gem.refresh
+      end
+    end
   end
 
 end

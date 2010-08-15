@@ -195,7 +195,7 @@ module Emissary
         end
       rescue Exception => e
         Emissary.logger.error "DispatchError: #{e.message}"
-        message = message.error(Emissary::Error.new(e).message)
+        message = message.error(e)
         agent_type = 'Emissary::Agent::Error'
       end
   
@@ -218,6 +218,6 @@ end # module Emissary
 
 $:.unshift Emissary::LIBPATH
 
-[ :errors, :logger, :operator, :agent, :identity, :message, :config ].each do |sublib|
+[ :errors, :logger, :operator, :agent, :identity, :message, :config, :gem_helper ].each do |sublib|
   require Emissary.sublib_path sublib.to_s
 end

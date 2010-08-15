@@ -202,10 +202,10 @@ module Emissary
           Emissary.dispatch(message, config, self).activate
           # ack message if need be (operator dependant)
           received message
-        rescue Exception => e
-          Emissary.logger.error "AgentThread: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
+        rescue Exception => error
+          Emissary.logger.error "AgentThread: #{error.message}\n\t#{error.backtrace.join("\n\t")}"
           rejected message, :requeue => true
-          send message.error(Emissary::Error.new(e).message)
+          send message.error error
         else
           increment_rx_count
         end

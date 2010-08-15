@@ -19,7 +19,7 @@ require 'bert'
 module Emissary
   class Message
 
-    attr_accessor :sender, :recipient, :replyto
+    attr_accessor :sender, :recipient, :replyto, :errors
     attr_accessor :status, :operation, :thread, :time
     attr_accessor :account, :agent, :method, :args
     attr_reader   :uuid, :originator
@@ -34,6 +34,8 @@ module Emissary
       @operation = -1
       @thread    = -1
       @uuid      = UUID.new.generate
+
+      @errors  = []
       
       @agent   = @method = nil
       @account = Emissary.identity.account_id
@@ -54,14 +56,15 @@ module Emissary
           :operation  => @operation,
           :thread     => @thread,
           :uuid       => @uuid,
-          :time       => @time.merge((payload[:time].symbolize! rescue {})),
-        }.merge((payload[:headers].symbolize! rescue {})),
+          :time       => @time.merge((payload[:time].symbolize rescue {})),
+        }.merge((payload[:headers].symbolize rescue {})),
         :data   => {
           :account => @account,
           :agent   => @agent,
           :method  => @method,
           :args    => @args
-        }.merge((payload[:data].symbolize! rescue {}))
+        }.merge((payload[:data].symbolize! rescue {})),
+        :errors => [ ] + (payload[:errors].symbolize rescue [])
       }
 
       payload[:headers].merge(payload[:data]).each do |k,v|
@@ -86,11 +89,22 @@ module Emissary
         :uuid       => uuid
       }
     end
-      
+    
     def data()
       return { :account => account, :agent => agent, :method => method, :args => args }
     end
 
+    def errors type = :default
+      case type
+        when :hashes
+          @errors.collect do |e|
+            { :type => e.class.name, :message => e.message, :backtrace => e.backtrace }
+          end
+      else
+        @errors
+      end
+    end
+    
     def status_type=(t) status[0] = t.to_sym; end
     def status_type() status[0] || :ok rescue :ok; end
 
@@ -134,7 +148,7 @@ module Emissary
     end
     
     def encode
-      BERT.encode({ :headers => headers, :data => data })
+      BERT.encode({ :headers => headers, :data => data, :errors => errors(:hashes) })
     end
 
     def self.decode payload
@@ -179,7 +193,8 @@ module Emissary
     def error(message = nil)
       message ||= 'Message failed due to unspecified error.'
       error = response()
-      error.status = [ :errored, message ] 
+      error.status = [ :errored, message.to_s ]
+      error.errors << message unless not message.kind_of? Exception
       return error
     end
   end
