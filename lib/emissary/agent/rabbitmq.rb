@@ -13,7 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/agent'
 require 'escape'
 
 module Emissary

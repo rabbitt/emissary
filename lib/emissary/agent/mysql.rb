@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/agent'
-
 require "mysql"
 require "monitor"
 require 'timeout'

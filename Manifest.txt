@@ -8,7 +8,7 @@ lib/emissary/logger.rb
 lib/emissary/identity.rb
 lib/emissary/identity/unix.rb
 lib/emissary/identity/ec2.rb
-lib/emissary/gem.rb
+lib/emissary/gem_helper.rb
 lib/emissary/errors.rb
 lib/emissary/daemon.rb
 lib/emissary/core_ext/symbolize.rb
@@ -16,6 +16,7 @@ lib/emissary/core_ext/misc_object.rb
 lib/emissary/core_ext/blank.rb
 lib/emissary/config.rb
 lib/emissary/agent.rb
+lib/emissary/agent/test.rb
 lib/emissary/agent/stats.rb
 lib/emissary/agent/sshkeys.rb
 lib/emissary/agent/rabbitmq.rb

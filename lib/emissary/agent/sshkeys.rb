@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/agent'
-
 require 'digest/md5'
 require 'base64'
 require 'etc'

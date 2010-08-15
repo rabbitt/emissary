@@ -71,6 +71,12 @@ module Emissary
         send("#{k}=".to_sym, v) rescue nil
       end
       
+      payload[:errors].collect! do |e|
+        exception = ::Emissary.klass_const(e[:type]).new(e[:message])
+        exception.set_backtrace(e[:backtrace])
+        exception
+      end
+      
       @agent   = @agent.to_sym rescue nil
       @method  = @method.to_sym rescue nil
       @args    = @args || [] rescue []
@@ -180,21 +186,21 @@ module Emissary
           :sent     => nil
         }
       }
-      return Message.new({ :headers => header, :data => data })
+      return Message.new({ :headers => header, :data => data, :errors => errors(:hashes) })
     end
 
     def bounce(message = nil)
       message ||= 'Message failed due to missing handler.'
-      bounced = response()
+      bounced = self.response
       bounced.status = [ :bounced, message ] 
       return bounced
     end
 
     def error(message = nil)
       message ||= 'Message failed due to unspecified error.'
-      error = response()
+      error = self.response
       error.status = [ :errored, message.to_s ]
-      error.errors << message unless not message.kind_of? Exception
+      error.errors << message unless not message.is_a? Exception
       return error
     end
   end

@@ -117,7 +117,7 @@ module Emissary
       class_name.split('::').each do |c|
         begin
           klass = klass.const_get(c.to_sym)
-        rescue NameError =>e 
+        rescue NameError => e 
           if autoload
             require_klass( (klass == Object ? c : "#{klass.to_s}::#{c}") )
             redo

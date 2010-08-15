@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/agent'
-
 module Emissary
   class Agent::Stats < Agent    
     STATISTIC_TYPES = [ :cpu, :network, :disk ]

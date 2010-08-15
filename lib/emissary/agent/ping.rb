@@ -13,8 +13,6 @@
 #   limitations under the License.
 #
 #
-require 'emissary/agent'
-
 module Emissary
   class Agent::Ping < Agent
     def valid_methods

@@ -14,13 +14,27 @@
 #
 #
 module Emissary
-  class Agent::File < Agent
+  class Agent::Test < Agent
     def valid_methods
-      [ :any ]
+      [:test_raise]
     end
-		
-    def activate
-      throw :skip_implicit_response 
+    
+    def test_raise klass, *args
+      ::Emissary.logger.debug "TEST AGENT: #test(#{klass}, #{args.inspect})"
+
+      exception = nil
+      begin
+        e_klass = ::Emissary.klass_const(klass)
+        unless not e_klass.is_a? Exception
+          raise e_klass, *args
+        else
+          raise Exception, "#{e_klass.name.to_s} is not a valid exception!"
+        end
+      rescue Exception => e
+        exception = e
+      end
+
+      message.error exception
     end
   end
 end
