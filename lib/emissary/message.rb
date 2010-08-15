@@ -71,10 +71,10 @@ module Emissary
         send("#{k}=".to_sym, v) rescue nil
       end
       
-      payload[:errors].collect! do |e|
+      payload[:errors].each do |e|
         exception = ::Emissary.klass_const(e[:type]).new(e[:message])
         exception.set_backtrace(e[:backtrace])
-        exception
+        errors << exception
       end
       
       @agent   = @agent.to_sym rescue nil
