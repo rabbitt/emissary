@@ -172,8 +172,9 @@ module Emissary
       def close
         unsubscribe
 
-        Emissary.logger.info "Requeueing unacknowledged messages"
-        @not_acked.each { |i| i.reject :requeue => true }
+        # Note: NOT currently supported by current version of RabbitMQ (1.7.x)
+        #Emissary.logger.info "Requeueing unacknowledged messages"
+        #@not_acked.each { |i| i.reject :requeue => true }
       end
       
       def status

@@ -53,10 +53,10 @@ module Emissary
           new_version = emissary_gem.update(version, source_url)
           ::Emissary.logger.debug "Emissary gem updated from '#{::Emissary.version}' to '#{new_version}'"
         else
-          message = "Emissary selfupdate unable to update to requested version '#{version}' using source '#{source_url}'"
-          ::Emissary.logger.warn message
+          notice = "Emissary selfupdate unable to update to requested version '#{version}' using source '#{source_url}'"
+          ::Emissary.logger.warn notice
           response = message.response
-          response.status_note = message
+          response.status_note = notice
           return response
         end
       rescue ::Gem::InstallError, ::Gem::GemNotFoundException => e
