@@ -18,8 +18,20 @@ require 'fileutils'
 
 module Emissary
   class Agent::Emissary < Agent
+    INIT_DATA = [
+      ::Emissary.identity.name,
+      ::Emissary.identity.public_ip,
+      ::Emissary.identity.local_ip,
+      ::Emissary.identity.instance_id,
+      ::Emissary.identity.server_id,
+      ::Emissary.identity.cluster_id,
+      ::Emissary.identity.account_id,
+      ::Emissary.identity.queue_name,
+      ::Emissary.version
+    ]
+    
     def valid_methods
-      [ :reconfig, :selfupdate, :startup, :shutdown ]
+      [ :reconfig, :selfupdate, :startup, :shutdown, :initdata ]
     end
     
     def reconfig new_config
@@ -81,20 +93,15 @@ module Emissary
     
     def startup
       message.recipient = config[:startup]
-      message.args = [
-        ::Emissary.identity.name,
-        ::Emissary.identity.public_ip,
-        ::Emissary.identity.local_ip,
-        ::Emissary.identity.instance_id,
-        ::Emissary.identity.server_id,
-        ::Emissary.identity.cluster_id,
-        ::Emissary.identity.account_id,
-        ::Emissary.identity.queue_name,
-      ]
-
+      message.args = INIT_DATA
       ::Emissary.logger.notice "Sending Startup message with args: #{message.args.inspect}"
-
       message
+    end
+
+    def initdata
+      response = message.response
+      response.args = INIT_DATA
+      response
     end
     
     def shutdown

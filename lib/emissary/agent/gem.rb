@@ -16,9 +16,13 @@
 module Emissary
   class Agent::Gem < Agent
     def valid_methods
-      [ :update, :install, :remove, :uninstall ]
+      [ :update, :install, :remove, :uninstall, :version ]
     end
 
+    def version gem_name
+      ::Emissary.GemHelper.new(gem_name).version
+    end
+    
     # Updates Emissary from the given source to the given version
     def install gem_name, version = :latest, source_url = :default
       ::Emissary::GemHelper.new(gem_name).install(version, source_url)
