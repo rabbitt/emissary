@@ -194,7 +194,7 @@ module Emissary
           end
         end
       rescue Exception => e
-        Emissary.logger.error "DispatchError: #{e.message}"
+        Emissary.logger.error "Dispatcher Error: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
         message = message.error(e)
         agent_type = 'Emissary::Agent::Error'
       end

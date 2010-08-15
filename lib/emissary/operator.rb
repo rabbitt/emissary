@@ -202,10 +202,10 @@ module Emissary
           Emissary.dispatch(message, config, self).activate
           # ack message if need be (operator dependant)
           received message
-        rescue Exception => error
-          Emissary.logger.error "AgentThread: #{error.message}\n\t#{error.backtrace.join("\n\t")}"
+        rescue Exception => e
+          Emissary.logger.error "AgentThread Error: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
+          send message.error(e)
           rejected message, :requeue => true
-          send message.error error
         else
           increment_rx_count
         end
@@ -218,13 +218,14 @@ module Emissary
         Emissary.logger.debug " ---> [PUBLISHER]  Sending new message ... "
         begin
           unless message.will_loop?
+            Emissary.logger.debug "[PUBLISHER] -- Sending message..."
             send_data message
             increment_tx_count
           else
             Emissary.logger.notice "Not sending message destined for myself - would loop."
           end
         rescue Exception => e
-          Emissary.logger.error "PublisherThread: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
+          Emissary.logger.error "PublisherThread Error: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
           shutdown!
         end
         Emissary.logger.debug " ---> [PUBLISHER]  tasks/workers: #{@publisher.cur_tasks}/#{@publisher.cur_threads}"

@@ -19,8 +19,8 @@ require 'uri'
 module Emissary
   class Operator
     module AMQP
-      class InvalidExchange < Emissary::Error; end
-      class InvalidConfig < Emissary::Error; end
+      class InvalidExchange < ArgumentError; end
+      class InvalidConfig < StandardError; end
 
       REQUIRED_KEYS   = [ :uri, :subscriptions ]
       VALID_EXCHANGES = [ :headers, :topic, :direct, :fanout ]
@@ -59,7 +59,7 @@ module Emissary
           :pass  => (::URI.decode(uri.password) rescue nil) || 'guest',
           :vhost => (! uri.path.empty? ? uri.path : '/nimbul'),
           :port  => uri.port || (ssl ? 5671 : 5672),
-          :logging => @config[:debug] || false,
+          :logging => true, # @config[:debug] || false,
         }
         
         # normalize the subscriptions
@@ -154,11 +154,11 @@ module Emissary
         @not_acked.delete(message.uuid).ack rescue true
         Emissary.logger.debug "Acknowledged Message ID: #{message.uuid}"
       rescue Exception => e
-        e = Emissary::Error.new(e)
-        Emissary.logger.error "Error in AMQP::Acknowledge: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
+        Emissary.logger.error "Error in AMQP::Acknowledge: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
       end
       
       def reject message, opts = { :requeue => true }
+        return true # currently not implemented in RabbitMQ 1.7.x (coming in versions supporting 0.9.1 AMQP spec)
         unless message.kind_of? Emissary::Message
           Emissary.logger.warning "Unable to reject message not deriving from Emissary::Message class" 
         end
@@ -166,8 +166,7 @@ module Emissary
         @not_acked.delete(message.uuid).reject(opts)
         Emissary.logger.debug "Rejected Message ID: #{message.uuid}"
       rescue Exception => e
-        e = Emissary::Error.new(e)
-        Emissary.logger.error "Error in AMQP::Reject: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
+        Emissary.logger.error "Error in AMQP::Reject: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
       end
       
       def close

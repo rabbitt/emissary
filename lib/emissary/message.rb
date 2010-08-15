@@ -200,7 +200,11 @@ module Emissary
       message ||= 'Message failed due to unspecified error.'
       error = self.response
       error.status = [ :errored, message.to_s ]
-      error.errors << message unless not message.is_a? Exception
+      if message.is_a? Exception
+        error.errors << message
+      else
+        ::Emissary.logger.warning "#{message.class.name} is not an exception..."
+      end
       return error
     end
   end
