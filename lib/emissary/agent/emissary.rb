@@ -58,14 +58,16 @@ module Emissary
 
     end
 
-    def selfupdate version = :latest, source_url = :default
+    def selfupdate version = :latest
       begin
-        unless not (emissary_gem = ::Emissary::GemHelper.new('emissary')).installable? version
-          ::Emissary.logger.debug "Emissary SelfUpdate to version '#{version.to_s}' from source '#{source_url.to_s}' requested."
-          new_version = emissary_gem.update(version, source_url)
+        emissary_gem = ::Emissary::GemHelper.new('emissary')
+        version, source_uri = emissary_gem.versions(:latest).flatten
+        unless not emissary_gem.installable? version
+          ::Emissary.logger.debug "Emissary SelfUpdate to version '#{version.to_s}' requested."
+          new_version = emissary_gem.update(version, source_uri)
           ::Emissary.logger.debug "Emissary gem updated from '#{::Emissary.version}' to '#{new_version}'"
         else
-          notice = "Emissary selfupdate unable to update to requested version '#{version}' using source '#{source_url}'"
+          notice = "Emissary selfupdate unable to update from #{::Emissary.version} to requested version [#{version}]."
           ::Emissary.logger.warn notice
           response = message.response
           response.status_note = notice
