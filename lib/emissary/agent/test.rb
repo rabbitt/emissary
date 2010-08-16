@@ -28,7 +28,7 @@ module Emissary
         unless not e_klass.try(:new).try(:is_a?, Exception)
           raise e_klass, *args
         else
-          raise Exception, "#{e_klass.name.to_s} is not a valid exception!"
+          raise Exception, "#{e_klass.name.to_s rescue e_klass.to_s} is not a valid exception name!"
         end
       rescue Exception => e
         exception = e
