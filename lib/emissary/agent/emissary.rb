@@ -31,7 +31,7 @@ module Emissary
     ]
     
     def valid_methods
-      [ :reconfig, :selfupdate, :startup, :shutdown, :initdata ]
+      [ :reconfig, :selfupdate, :startup, :shutdown, :initdata, :reinit ]
     end
     
     def reconfig new_config
@@ -97,7 +97,8 @@ module Emissary
       ::Emissary.logger.notice "Sending Startup message with args: #{message.args.inspect}"
       message
     end
-
+    alias :reinit :startup
+    
     def initdata
       response = message.response
       response.args = INIT_DATA

@@ -1,6 +1,10 @@
 ##### BORROWED FROM ACTIVESUPPORT #####
 
 class Object
+  def try name, *args
+    self.__send__(name, *args) unless not self.respond_to? name
+  end
+  
   def __method__
     caller[0] =~ /\d:in `([^']+)'/
     $1.to_sym rescue nil

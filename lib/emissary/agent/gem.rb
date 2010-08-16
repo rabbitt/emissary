@@ -13,6 +13,7 @@
 #   limitations under the License.
 #
 #
+
 module Emissary
   class Agent::Gem < Agent
     def valid_methods

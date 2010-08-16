@@ -25,7 +25,7 @@ module Emissary
       exception = nil
       begin
         e_klass = ::Emissary.klass_const(klass)
-        unless not e_klass.new.is_a? Exception
+        unless not e_klass.try(:new).try(:is_a?, Exception)
           raise e_klass, *args
         else
           raise Exception, "#{e_klass.name.to_s} is not a valid exception!"
