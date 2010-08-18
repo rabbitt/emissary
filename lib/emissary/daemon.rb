@@ -344,6 +344,12 @@ module Emissary
     def start_run_loop
       while not @shutting_down do
         @operators.each do |name,operator|
+          if operators[:start_count].to_i > MAX_RESTARTS
+            ::Emissary.logger.warning "Start Count > MAX_RESTARTS for operator '#{name}' - removing from list of operators..."
+            @operators.delete(name) 
+            next
+          end
+          
           if can_startup? operator
             Emissary.logger.notice "Starting up Operator: #{name}"
             
@@ -370,12 +376,10 @@ module Emissary
 
             if operator[:start_count] >= MAX_RESTARTS
               Emissary.logger.warning "Operator '#{name}' has been restarted #{MAX_RESTARTS} times. " +
-                                      "I will not attempt to restart it any longer."
+                                      "I will not attempt to restart it anymore."
             end
 
             Emissary.logger.notice "Forked Operator '#{name}' with pid #{operator[:daemon_pid]}"
-          else
-            @operators.delete(name) unless operators[:start_count] < MAX_RESTARTS
           end
         end
 
