@@ -13,6 +13,9 @@
 #   limitations under the License.
 #
 #
+require 'net/http'
+require 'socket'
+
 module Emissary
   class Identity::Ec2 < Identity
     register :ec2, :priority => 25
@@ -52,7 +55,8 @@ module Emissary
         http.start do |http|
           http.get(uri).body
         end
-      rescue Exception
+      rescue Exception => e
+        ::Emissary.logger.debug "Passing identifier request to next identity handler due to failed HTTP#get request: #{e.class.name}: #{e.message}"
         throw :pass
       end
     end

@@ -61,13 +61,32 @@ module Emissary
     def selfupdate version = :latest
       begin
         emissary_gem = ::Emissary::GemHelper.new('emissary')
-        version, source_uri = emissary_gem.versions(:latest).flatten
-        unless not emissary_gem.installable? version
-          ::Emissary.logger.debug "Emissary SelfUpdate to version '#{version.to_s}' requested."
-          new_version = emissary_gem.update(version, source_uri)
+        request_version, source_uri = emissary_gem.versions(version).flatten
+        current_version, _ = emissary_gem.versions(:current).flatten
+
+        unless not emissary_gem.installable? request_version
+          ::Emissary.logger.debug "Emissary SelfUpdate to version '#{request_version.to_s}' requested."
+          new_version = emissary_gem.update(request_version, source_uri)
           ::Emissary.logger.debug "Emissary gem updated from '#{::Emissary.version}' to '#{new_version}'"
         else
-          notice = "Emissary selfupdate unable to update from #{::Emissary.version} to requested version [#{version}]."
+          ::Emissary.logger.debug " -- SELFUPDATE -- [         VERSION: #{version}]"
+          ::Emissary.logger.debug " -- SELFUPDATE -- [ CURRENT_VERSION: #{current_version}]"
+          ::Emissary.logger.debug " -- SELFUPDATE -- [ REQUEST_VERSION: #{request_version}]"
+          
+          notice = 'Emissary selfupdate skipped - ' + case true
+            when request_version.nil?
+              if version == :latest
+                "already at latest version."
+              else
+                "non-existent version '#{version}'"
+              end
+            when current_version == request_version
+              "already at specified version #{version}."
+            when current_version > request_version
+              "downgrade to version #{request_version} not allowed."
+            else
+              "unable to update from #{::Emissary.version} to requested version #{request_version}."
+          end
           ::Emissary.logger.warn notice
           response = message.response
           response.status_note = notice
@@ -94,8 +113,8 @@ module Emissary
     end
     
     def startup
+      message = initdata
       message.recipient = config[:startup]
-      message.args = INIT_DATA
       ::Emissary.logger.notice "Sending Startup message with args: #{message.args.inspect}"
       message
     end

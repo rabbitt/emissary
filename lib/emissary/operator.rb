@@ -17,17 +17,6 @@ require 'monitor'
 require 'work_queue'
 
 module Emissary
-  # ### MONKEY PATCH AHEAD: YOU'VE BEEN WARNED!! ###
-  # WorkQueueu oddly loses threads in some weird situation I have figured out yet
-  # while using Mutex - switching to Monitor seems to fix it.
-  # 
-  class WorkQueue < ::WorkQueue
-    def initialize *args
-      super(*args)
-      @threads_lock = Monitor.new if @threads_lock.instance_of? Mutex
-    end
-  end
-
   module OperatorStatistics
     RX_COUNT_MUTEX = Mutex.new
     TX_COUNT_MUTEX = Mutex.new
@@ -96,30 +85,36 @@ module Emissary
 
     def initialize(config, *args)
       @config    = config
-      @workers   = DEFAULT_MAX_WORKERS #args[0][:max_workers] || DEFAULT_MAX_WORKERS rescue DEFAULT_MAX_WORKERS
+      @workers   = (args[0][:max_workers] || DEFAULT_MAX_WORKERS rescue DEFAULT_MAX_WORKERS)
+
       @agents    = WorkQueue.new(@workers, nil, MAX_WORKER_TTL)
       @publisher = WorkQueue.new(@workers, nil, MAX_WORKER_TTL)
+
+      @timer     = nil
       @stats     = WorkQueue.new(1, nil, MAX_WORKER_TTL)
 
       @rx_count  = 0
       @tx_count  = 0
 
       @shutting_down = false
+      @connected = false
     end
+
+    def connected?() @connected; end
 
     def post_init
     end
 
     def connect
-      raise Emissary::Error.new(NotImplementedError, 'The connect method must be defined by the operator module')
+      raise NotImplementedError, 'The connect method must be defined by the operator module'
     end
 
     def subscribe
-      raise Emissary::Error.new(NotImplementedError, 'The subscrie method must be defined by the operator module')
+      raise NotImplementedError, 'The subscrie method must be defined by the operator module'
     end
 
     def unsubscribe
-      raise Emissary::Error.new(NotImplementedError, 'The unsubscribe method must be defined by the operator module')
+      raise NotImplementedError, 'The unsubscribe method must be defined by the operator module'
     end
 
     def acknowledge message
@@ -129,42 +124,47 @@ module Emissary
     end
     
     def send_data
-      raise Emissary::Error.new(NotImplementedError, 'The send_data method must be defined by the operator module')
+      raise NotImplementedError, 'The send_data method must be defined by the operator module'
     end
     
     def close
-      raise Emissary::Error.new(NotImplementedError, 'The close method must be defined by the operator module')
+      raise NotImplementedError, 'The close method must be defined by the operator module'
     end
 
     def run
-      connect
+      @connected = !!connect
       subscribe 
-      start_stats_notifier
-      send_startup_notification
+      schedule_statistics_gatherer
+      notify :startup
+      connected?
     end
 
     def disconnect
       close
+      @connected = false
     end
 
     def shutting_down?() @shutting_down; end
+    
     def shutdown!
-      @shutting_down = true
-
-      Emissary.logger.notice "Shutting down..."
-      send_shutdown_notification
-
-      Emissary.logger.info "Cancelling periodic timer for statistics gatherer..."
-      @timer.cancel
-      
-      Emissary.logger.info "Shutting down agent workqueue..."
-      @agents.join
-
-      Emissary.logger.info "Shutting down publisher workqueue..."
-      @publisher.join
-
-      Emissary.logger.info "Disconnecting..."
-      disconnect
+      unless shutting_down?
+        @shutting_down = true
+  
+        Emissary.logger.info "Cancelling periodic timer for statistics gatherer..."
+        @timer.cancel
+        
+        Emissary.logger.notice "Shutting down..."
+        notify :shutdown
+  
+        Emissary.logger.info "Shutting down agent workqueue..."
+        @agents.join
+  
+        Emissary.logger.info "Shutting down publisher workqueue..."
+        @publisher.join
+  
+        Emissary.logger.info "Disconnecting..."
+        disconnect
+      end
     end
 
     def enabled? what
@@ -198,10 +198,15 @@ module Emissary
     def receive message
       @agents.enqueue_b {
         begin
+          raise message.errors.first unless message.errors.empty? or not message.errors.first.is_a? Exception
           Emissary.logger.debug " ---> [DISPATCHER] Dispatching new message ... "
           Emissary.dispatch(message, config, self).activate
           # ack message if need be (operator dependant)
           received message
+        rescue ::Emissary::Error::InvalidMessageFormat => e
+          Emissary.logger.warning e.message
+          rejected message, :requeue => true
+          # if it was an encoding error, then we are done - nothing more we can do
         rescue Exception => e
           Emissary.logger.error "AgentThread Error: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
           send message.error(e)
@@ -226,58 +231,43 @@ module Emissary
           end
         rescue Exception => e
           Emissary.logger.error "PublisherThread Error: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
-          shutdown!
+          @shutting_down = true
         end
         Emissary.logger.debug " ---> [PUBLISHER]  tasks/workers: #{@publisher.cur_tasks}/#{@publisher.cur_threads}"
       }
     end
 
-    def send_startup_notification
-      return unless enabled? :startup and EM.reactor_running?   
-      Emissary.logger.notice "Sending Startup Notification."
-      message = Emissary::Message.new({})
-      message.agent   = :emissary
-      message.method = :startup
-      message.recipient = config[:startup]
-      # we receive it and pass it off to the agent who
-      # then just sends it off to the correct location
-      receive message
-    end
+    def notify type
+      return unless enabled? type and EM.reactor_running?
+      
+      message = Emissary::Message.new(:data => { :agent => :emissary, :method => type })
+      case type
+        when :startup, :shutdown
+          message.recipient = config[type]
+        when :stats
+          message.agent = :stats
+          message.method = :gather
+      end
 
-    def send_shutdown_notification
-      Emissary.logger.notice "Entering shutdown notification..."
-      return unless enabled? :shutdown and EM.reactor_running?
-      Emissary.logger.notice "Sending Shutdown Notification."
-      message = Emissary::Message.new({})
-      message.agent   = :emissary
-      message.method = :shutdown
-      message.recipient = config[:shutdown]
-      # we receive it and the agent just resends it off
-      # to the correct location
+      Emissary.logger.notice "Running #{type.to_s.capitalize} Notifier"
       receive message
     end
     
-    def start_stats_notifier
+    def schedule_statistics_gatherer
       stats_interval = enabled?(:stats) && config[:stats][:interval] ? config[:stats][:interval].to_i : DEFAULT_STATUS_INTERVAL
       
       # setup agent to process sending of messages
       @timer = EM.add_periodic_timer(stats_interval) do
-        rx = rx_count
-        tx = tx_count
+        rx = rx_count; tx = tx_count
         rx_throughput = sprintf "%0.4f", (rx.to_f / stats_interval.to_f)
         tx_throughput = sprintf "%0.4f", (tx.to_f / stats_interval.to_f)
         
-        Emissary.logger.notice "[METRIC] publisher tasks/workers: #{@publisher.cur_tasks}/#{@publisher.cur_threads}"
-        Emissary.logger.notice "[METRIC] dispatcher tasks/workers: #{@agents.cur_tasks}/#{@agents.cur_threads}"
-        Emissary.logger.notice "[METRIC] #{tx} in #{stats_interval} seconds - tx rate: #{tx_throughput}/sec"
-        Emissary.logger.notice "[METRIC] #{rx} in #{stats_interval} seconds - rx rate: #{rx_throughput}/sec"
+        Emissary.logger.notice "[statistics] publisher tasks/workers: #{@publisher.cur_tasks}/#{@publisher.cur_threads}"
+        Emissary.logger.notice "[statistics] dispatcher tasks/workers: #{@agents.cur_tasks}/#{@agents.cur_threads}"
+        Emissary.logger.notice "[statistics] #{tx} in #{stats_interval} seconds - tx rate: #{tx_throughput}/sec"
+        Emissary.logger.notice "[statistics] #{rx} in #{stats_interval} seconds - rx rate: #{rx_throughput}/sec"
         
-        unless not enabled? :stats or EM.reactor_running?
-          message = Emissary::Message.new({})
-          message.agent   = :stats
-          message.method = :gather
-          receive message          
-        end        
+        notify :stats
       end
     end
   end

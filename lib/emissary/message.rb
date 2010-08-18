@@ -158,7 +158,13 @@ module Emissary
     end
 
     def self.decode payload
-      self.new BERT.decode(payload)
+      begin
+        self.new BERT.decode(payload)
+      rescue StandardError => e
+        raise e unless e.message =~ /bad magic/i
+        Emissary.logger.error "Unable to decode message - maybe it wasn't encoded with BERT..?"
+        raise ::Emissary::Error::InvalidMessageFormat, "Unable to decode message - maybe it wasn't encoded with BERT? Message: #{payload.inspect}"
+      end
     end
 
     def stamp_sent!

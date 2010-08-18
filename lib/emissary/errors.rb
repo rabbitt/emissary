@@ -14,8 +14,12 @@
 #
 #
 module Emissary
-  class Error < StandardError
 
+  class Error< StandardError
+    class ConnectionError < StandardError; end
+    class InvalidMessageFormat < StandardError; end
+    class NotImplementedError < StandardError; end
+    
     attr_reader :origin
 
     def self.new(*args) #:nodoc:

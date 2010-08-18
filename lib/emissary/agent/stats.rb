@@ -36,33 +36,49 @@ module Emissary
     end
     
     def gather
-      message.recipient = config[:stats][:queue_base]
-      STATISTIC_TYPES.each do |type|
-        stat_message = message.clone
-        stat_message.recipient = "#{message.routing_key}.#{type.to_s}:#{message.exchange_type.to_s}"
-        stat_message.args = self.__send__(type) unless not self.respond_to? type
-        send stat_message unless stat_message.args.empty?
+      message.recipient = "#{config[:stats][:queue_base]}:#{message.exchange_type.to_s}"
+      message.args = STATISTIC_TYPES.inject([]) do |args, type|
+        unless (data = self.__send__(type)).nil?
+          args << { type => data }
+        end
+        args
       end
 
-      throw :skip_implicit_response
+      throw :skip_implicit_response unless not message.args.empty?
+      return message
+    end
+
+    def disk
     end
     
     def cpu
-      Sys::CPU.load_avg
+      load_average = Sys::CPU.load_avg
+      ::Emissary.logger.notice "[statistics] CPU: #{load_average.join ', '}"
+      load_average
     end
     
     def network
-      data = {}
-      (ifconfig = IfconfigWrapper.new.parse).interfaces.each do |iface|
-        data[iface] = {
-          :tx  => ifconfig[iface].tx,
-          :rx  => ifconfig[iface].rx,
-          :up  => ifconfig[iface].status,
-          :ips => ifconfig[iface].addresses('inet').collect { |ip| ip.to_s }
-        }
+      interfaces = (ifconfig = IfconfigWrapper.new.parse).interfaces.inject([]) do |interfaces, name|
+        interfaces << (interface = {
+          :name => name,
+          :tx   => ifconfig[name].tx.symbolize,
+          :rx   => ifconfig[name].rx.symbolize,
+          :up   => ifconfig[name].status,
+          :ips  => ifconfig[name].addresses('inet').collect { |ip| ip.to_s }
+        })
+        
+        ::Emissary.logger.notice("[statistics] Network#%s: state:%s tx:%d rx:%d inet:%s",
+          name,
+          (interface[:up] ? 'up' : 'down'),
+          interface[:tx][:bytes],
+          interface[:rx][:bytes],
+          interface[:ips].join(',')
+        ) unless interface.try(:[], :tx).nil?
+        
+        interfaces
       end
       
-      return [ data ]
+      return interfaces
     end
   end
 end

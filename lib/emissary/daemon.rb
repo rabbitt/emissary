@@ -288,7 +288,7 @@ module Emissary
     def reconfig
       Emissary.logger.warn "Reloading configuration."
       begin
-        new_config = get_config(config_file, STARTUP_OPTS)
+        new_config = Daemon.get_config(config_file, STARTUP_OPTS)
       rescue Exception => e
         Emissary.logger.error "Unable to reload configuration due to error:\n#{e.message}\n\t#{e.backtrace.join("\n\t")}"
       else
@@ -344,7 +344,7 @@ module Emissary
     def start_run_loop
       while not @shutting_down do
         @operators.each do |name,operator|
-          unless not can_startup? operator
+          if can_startup? operator
             Emissary.logger.notice "Starting up Operator: #{name}"
             
             server_data = {
@@ -371,10 +371,11 @@ module Emissary
             if operator[:start_count] >= MAX_RESTARTS
               Emissary.logger.warning "Operator '#{name}' has been restarted #{MAX_RESTARTS} times. " +
                                       "I will not attempt to restart it any longer."
-              @operators.delete(name)
             end
 
             Emissary.logger.notice "Forked Operator '#{name}' with pid #{operator[:daemon_pid]}"
+          else
+            @operators.delete(name) unless operators[:start_count] < MAX_RESTARTS
           end
         end
 

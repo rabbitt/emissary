@@ -13,6 +13,7 @@
 #   limitations under the License.
 #
 #
+require 'eventmachine'
 require 'mq'
 require 'uri'
 
@@ -47,7 +48,7 @@ module Emissary
         raise errors.join("\n") unless errors.empty?
         return true
       end
-      
+
       def post_init
         uri = ::URI.parse @config[:uri]
         ssl = (uri.scheme.to_sym == :amqps)
@@ -59,7 +60,7 @@ module Emissary
           :pass  => (::URI.decode(uri.password) rescue nil) || 'guest',
           :vhost => (! uri.path.empty? ? uri.path : '/nimbul'),
           :port  => uri.port || (ssl ? 5671 : 5672),
-          :logging => true, # @config[:debug] || false,
+          :logging => !!@config[:debug],
         }
         
         # normalize the subscriptions
@@ -78,6 +79,11 @@ module Emissary
       end
       
       def connect
+        if @connect_details[:ssl] and not EM.ssl?
+          raise ::Emissary::Error::ConnectionError ,
+            "Requested SSL connection but EventMachine not compiled with SSL support - quitting!"
+        end
+
         @message_pool = Queue.new
 
         @connection = ::AMQP.connect(@connect_details)
@@ -96,6 +102,7 @@ module Emissary
         @exchanges[:fanout] = ::MQ::Exchange.new(@channel, :fanout, 'amq.fanout')
         @exchanges[:direct] = ::MQ::Exchange.new(@channel, :direct, 'amq.direct')
         
+        true
       end
       
       def subscribe
@@ -111,12 +118,16 @@ module Emissary
         @queue.bind(@exchanges[:direct], :key => Emissary.identity.queue_name)
 
         @queue.subscribe(:ack => true) do |info, message|
-          message = Emissary::Message.decode(message).stamp_received!
+          begin
+            message = Emissary::Message.decode(message).stamp_received!
+          rescue ::Emissary::Error::InvalidMessageFormat => e
+            message = Emissary::Message.new
+            message.errors << e
+          end
+          
           @not_acked[message.uuid] = info
           Emissary.logger.debug "Received through '#{info.exchange}' and routing key '#{info.routing_key}'"
 
-          # call parent receive method instead of bothering with receive_data
-          # this way we can do this asynchronously via our work queues in the parent
           receive message 
         end
       end
@@ -151,10 +162,12 @@ module Emissary
           Emissary.logger.warning "Can't acknowledge message not deriving from Emissary::Message class" 
         end
         
-        @not_acked.delete(message.uuid).ack rescue true
+        @not_acked.delete(message.uuid).ack 
         Emissary.logger.debug "Acknowledged Message ID: #{message.uuid}"
+      rescue NoMethodError
+        Emissary.logger.warning "Message with UUID #{message.uuid} not acknowledged."
       rescue Exception => e
-        Emissary.logger.error "Error in AMQP::Acknowledge: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
+        Emissary.logger.error "Error in Emissary::Operator::AMQP#acknowledge: #{e.class.name}: #{e.message}\n\t#{e.backtrace.join("\n\t")}"
       end
       
       def reject message, opts = { :requeue => true }
