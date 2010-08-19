@@ -49,6 +49,18 @@ module Emissary
     end
 
     def disk
+      @cmd = "/usr/bin/env df -B K -P -T -x devfs -x tmpfs | /usr/bin/env tail -n +2"
+      
+      data = IO.popen(@cmd){ |f| f.readlines }.collect { |l| l.split(/\s+/) }
+      data.inject([]) { |data,line|
+        device = Hash[[:device, :type, :size, :used, :avail, :percent, :mount].zip(line.collect!{|v| v =~ /^\d+/ ? v[/^(\d+)/].to_i : v })]
+        
+        ::Emissary.logger.notice("[statistics] Disk#%s: type:%s mount:%s size:%d used:%d in-use:%d%%",
+          device[:device], device[:type], device[:mount], device[:size], device[:used], device[:percent]
+        )
+        
+        data << device
+      }
     end
     
     def cpu
