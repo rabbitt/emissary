@@ -20,6 +20,7 @@ require 'uri'
 module Emissary
   class Operator
     module AMQP
+
       class InvalidExchange < ArgumentError; end
       class InvalidConfig < StandardError; end
 
@@ -183,11 +184,16 @@ module Emissary
       end
       
       def close
-        unsubscribe
-
         # Note: NOT currently supported by current version of RabbitMQ (1.7.x)
         #Emissary.logger.info "Requeueing unacknowledged messages"
         #@not_acked.each { |i| i.reject :requeue => true }
+
+        # unfortunately, due to the nature of amqp's deferred asyncronous handling of data send/recv
+        # and no ability to determine whether our shutdown message was /actually/ sent, we have to resort
+        # to sleeping for 1s to ensure our message went out
+        sleep 1 # XXX: HACK HACK HACK - BAD BAD BAD :-(
+        unsubscribe
+        ::AMQP.stop 
       end
       
       def status

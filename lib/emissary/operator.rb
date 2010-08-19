@@ -56,7 +56,7 @@ module Emissary
   class Operator
     include Emissary::OperatorStatistics
     
-    DEFAULT_STATUS_INTERVAL = 60
+    DEFAULT_STATUS_INTERVAL = 3600
     DEFAULT_MAX_WORKERS     = 50
     MAX_WORKER_TTL          = 60
     
