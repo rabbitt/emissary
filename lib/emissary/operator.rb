@@ -15,6 +15,7 @@
 #
 require 'monitor'
 require 'work_queue'
+require 'fastthread'
 
 module Emissary
   module OperatorStatistics
