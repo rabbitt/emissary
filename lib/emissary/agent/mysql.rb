@@ -187,7 +187,7 @@ module Emissary
       raise "get_binlog_info must be called from within a lock." unless locked?
       (result = connection.query("SHOW MASTER STATUS")).fetch_row[0,2]
     ensure
-      result.free
+      result.free unless result.nil?
     end
   
     def spawn_lockwatch_thread!

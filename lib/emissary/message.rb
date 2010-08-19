@@ -72,7 +72,7 @@ module Emissary
       end
       
       payload[:errors].each do |e|
-        exception = ::Emissary.klass_const(e[:type]).new(e[:message])
+        exception = ::Emissary.klass_const(e[:type]).new(e[:message]) rescue StandardError.new("#{e[:type]}: #{e[:message]}")
         exception.set_backtrace(e[:backtrace])
         errors << exception
       end
