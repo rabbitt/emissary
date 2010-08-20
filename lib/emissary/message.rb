@@ -26,7 +26,7 @@ module Emissary
     
     def initialize(payload = {})
       @recipient  = ''
-      @sender     = Emissary.identity.name
+      @sender     = Emissary.identity.queue_name
       @replyto    = Emissary.identity.queue_name
       @originator = @sender.dup
       
