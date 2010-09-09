@@ -1,0 +1,143 @@
+#!/usr/bin/env ruby
+
+require 'rubygems'
+require 'optparse'
+require 'ostruct'
+require 'pp'
+
+def require_lib library
+  begin
+    require library
+  rescue LoadError
+    real_name = library[/([^\/]+)/,1]
+    puts %Q(Missing required library '#{real_name}' - please install to continue: sudo gem install #{real_name})
+    exit! 1
+  end
+end
+
+require_lib 'mq'
+require_lib 'highline/import'
+require_lib 'emissary'
+
+$options = OpenStruct.new(
+  :user     => 'nimbul',
+  :pass     => nil,
+  :host     => ENV['AMQP_HOST'] || 'mq.example.tld',
+  :port     => ENV['AMQP_PORT'] || 5672,
+  :vhost    => ENV['AMQP_VHOST'] || '/nimbul',
+  :ssl      => (ENV['AMQP_USE_SSL'].nil? ? true : !!ENV['AMQP_USE_SSL']),
+  :bindings => { :direct => [], :topic => [], :fanout  => [] }
+)
+
+def password
+  $options.pass = ask('Enter AMQP Service password: ') { |q| q.echo = '*' } unless not $options.pass.blank?
+  $options.pass
+end
+
+OptionParser.new("Usage: #{File.basename($0)} [options] -- 'exchange_type:route_key1' .. 'exchange_type:route_keyN' ") do |parser|
+  parser.separator ''
+  parser.separator "Connection Options:"
+  parser.on('-u', '--user [USER]', %Q(User to connect to the AMQP service as. Default: #{$options.user})) {|v| $options.user = v }
+  parser.on('-p', '--password [PASS]', %Q(Password to use when connecting to AMQP service. Default: <empty>)) { |v| $options.pass = escape_password(v)}
+  parser.on('-H', '--host [HOST]', String, %Q(Host to connect to for AMQP service. Default: #{$options.host})) {|v| $options.host= v }
+  parser.on('-P', '--port [PORT]', Integer, %Q(Port to connect to for AMQP service. Default: #{$options.port})) {|v| $options.port = v }
+  parser.on('-V', '--vhost [VHOST]', %Q(VHOST to use when connecting to AMQP service. Default: #{$options.vhost})) { |v| $options.vhost = v }
+  parser.on('--[no-]ssl', 'Use ssl (or not) when connecting to the AMQP service. Default: true') { |v| $options.ssl = !!v }
+  
+  parser.separator ''
+  parser.separator 'General'
+  parser.on_tail('-h', '--help', 'This message') { puts parser.help; exit! 0 }
+
+  result = parser.parse!
+  
+  unless ARGV.size > 0
+    puts "Missing required exchange bindings (format: <exchange>:<route_key>)"
+    exit! 1
+  else
+    ARGV.each do |binding|
+      binding = "topic:#{binding}" unless binding.include? ':'
+      type, route = binding.downcase.split(/:/)
+      
+      unless $options.bindings.include? type.to_sym
+        puts %Q(Unsupported exchange type '#{type}' - valid exchanges are: #{$options.bindings.keys.join ', '})
+        exit! 1
+      end
+      
+      $options.bindings[type.to_sym] << route
+    end
+  end  
+  result 
+end
+
+HOSTNAME = `hostname -f`.strip 
+
+def connect
+		@connect_details = {
+				:host  => $options.host,
+				:ssl   => $options.ssl,
+				:port  => $options.port, 
+				:user  => $options.user,
+				:pass  => password,
+				:vhost => $options.vhost
+		}
+		
+		@connection = ::AMQP.connect(@connect_details)
+		@channel = ::MQ.new(@connection)
+		
+		@queue_config = {
+				:durable     => false,
+				:auto_delete => true,
+				:exclusive   => true
+		}
+		
+		puts "QUEUE: #{HOSTNAME}.#{$$}"
+		@queue = ::MQ::Queue.new(@channel, "#{HOSTNAME}.#{$$}", @queue_config)
+		
+		@exchanges = {}
+		@exchanges[:topic]  = ::MQ::Exchange.new(@channel, :topic,  'amq.topic')
+		@exchanges[:fanout] = ::MQ::Exchange.new(@channel, :fanout, 'amq.fanout')
+		@exchanges[:direct] = ::MQ::Exchange.new(@channel, :direct, 'amq.direct')
+
+end
+
+def subscribe
+    $options.bindings.each do |type, bindings|
+      bindings.each { |routing_key|
+        puts "Binding to #{type.to_s.capitalize} exchange with routing key '#{routing_key}'"
+        @queue.bind(@exchanges[type], :key => routing_key )
+      }
+    end
+    
+    puts; puts
+    puts "Waiting for Messages..."
+    puts "------"
+    
+		@queue.subscribe do |header,message|
+      puts "Received Message:"
+      puts "------- START -------"
+      begin
+				m = Emissary::Message.decode(message)
+				puts
+				puts "AMQP Headers: #{header.inspect}"
+				puts "Emissary Headers: "; pp m.headers
+				puts "Emissary Data: "; pp m.data
+        puts "Emissary Errors: "; pp m.errors
+      rescue ::Emissary::Error::InvalidMessageFormat => e
+        puts 
+        puts "AMQP Headers: #{header.inspect}"
+        puts "Message: #{message}"
+      end
+      puts "------- END -------"
+		end
+end
+
+EM.run do
+		trap("INT") { EM.stop }
+		trap("TERM") { EM.stop }
+		connect
+    subscribe	
+    EM.add_periodic_timer(300) {
+      # reset every five minutes in case of connection issues
+      @queue.reset
+    }
+end

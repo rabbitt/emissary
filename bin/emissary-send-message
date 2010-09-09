@@ -1,0 +1,154 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'ostruct'
+
+def require_lib library
+  begin
+    require library
+  rescue LoadError
+    puts %q(Missing required library '#{library[/([^\/]+)/,1}' - please install to continue: sudo gem install eventmachine)
+    exit! 1
+  end
+end
+
+require_lib 'eventmachine'
+require_lib 'highline/import'
+require_lib 'emissary'
+
+$options = OpenStruct.new(
+  :user     => 'nimbul',
+  :pass     => nil,
+  :host     => ENV['AMQP_HOST'] || 'mq.example.tld',
+  :port     => ENV['AMQP_PORT'] || 5672,
+  :vhost    => ENV['AMQP_VHOST'] || '/nimbul',
+  :ssl      => (ENV['AMQP_USE_SSL'].nil? ? true : !!ENV['AMQP_USE_SSL']),
+  :uri      => '',
+  :route    => 'request.#',
+  :exchange => 'topic',
+  :agent    => :ping,
+  :func     => :ping,
+  :account  => -1,
+  :timeout  => 0.25,
+  :show_message => false,
+  :raise_errors => true
+)
+
+$options.uri = "amqps://#{$options.host}:#{$options.port}/nimbul"
+
+def escape_password password
+  URI.escape(password, '~`!@#$%^&*()_-+=[]{}|\:;<,>.?/')
+end
+
+OptionParser.new("Usage: #{File.basename($0)} [options] -- [ARGS]") do |parser|
+  parser.separator ''
+  parser.separator "Connection Options:"
+
+  parser.on('-u', '--user [USER]', %Q(User to connect to the AMQP service as. Default: #{$options.user})) {|v| $options.user = v }
+  parser.on('-p', '--password [PASS]', %Q(Password to use when connecting to AMQP service. Default: <empty>)) { |v| $options.pass = escape_password(v)}
+  parser.on('-H', '--host [HOST]', String, %Q(Host to connect to for AMQP service. Default: #{$options.host})) {|v| $options.host= v }
+  parser.on('-P', '--port [PORT]', Integer, %Q(Port to connect to for AMQP service. Default: #{$options.port})) {|v| $options.port = v }
+  parser.on('-V', '--vhost [VHOST]', %Q(VHOST to use when connecting to AMQP service. Default: #{$options.vhost})) { |v| $options.vhost = v }
+  parser.on('--[no-]ssl', 'Use ssl (or not) when connecting to the AMQP service. Default: true') { |v| $options.ssl = !!v }
+  parser.on('-U', '--uri [URI]', "URI to use when connecting. Default: #{$options.uri}") { |v| $options.uri = v }
+  
+  parser.separator ''
+  parser.separator 'Routing Options:'
+  parser.on('-r', '--route [ROUTE]', String, 'Routing key to use when sending message') { |v| $options.route = v }
+  parser.on('-x', '--exchange [EXCHANGE]', [ 'topic', 'direct' ], 'Exchange type (topic/direct) used when routing message [DEFAULT: topic]') \
+    { |v| $options.exchange = v.downcase }
+
+  parser.separator ''
+  parser.separator 'Package Data:'
+  parser.on('-a', '--agent [NAME]', String, 'Agent to request execution of') { |v| $options.agent = v.to_sym }
+  parser.on('-A', '--account [ID]', Integer, 'Account to request execution of') { |v| $options.account = v.to_i }
+  parser.on('-m', '--method [NAME]', String, 'Method to request execution of') { |v| $options.func = v.to_sym }
+  parser.on('-t', '--timeout [SECONDS]', Float, 'Time to wait from last message before quitting [DEFAULT: 5 seconds]') \
+    { |v| v > 0 ? $options.timeout = v : nil }
+  
+  parser.separator ''
+  parser.separator 'General'
+  parser.on_tail('--show-message', 'Display the message that would be sent and exit') { |v| $options.show_message = v }
+  parser.on_tail('--[no-]raise-errors', 'Raise errors received in respose messages.') { |v| $options.raise_errors = v }
+  parser.on_tail('-h', '--help', 'This message') { puts parser.help; exit! 0 }
+
+  result = parser.parse!
+  result 
+end
+
+def get_message
+  message = Emissary::Message.new(
+    :headers => { 
+      :recipient => "#{$options.route}:#{$options.exchange}", 
+      :replyto => 'nimbul:direct',
+      :sender => 'nimbul:direct',
+      :originator => 'nimbul:direct'
+     },
+    :data => {
+      :agent   => $options.agent,
+      :method  => $options.func,
+      :account => $options.account,
+      :args    => ARGV
+    }
+  )
+  
+  unless not $options.show_message 
+    puts "Sending the following message:"; pp message
+    exit! 0
+  end
+  
+  message
+end
+
+def get_operator
+  unless not $options.pass.blank?
+    $options.pass = escape_password(ask('Enter AMQP Service password: ') { |q| q.echo = '*' })
+  end
+  
+  connect_uri = URI.parse($options.uri)
+  connect_uri.user      = $options.user || 'nimbul'
+  connect_uri.password  = $options.pass 
+  connect_uri.host      = $options.host
+  connect_uri.port      = $options.port || ($options.ssl ? 5671 : 5672)
+  connect_uri.scheme    = $options.ssl ? 'amqps' : 'amqp'
+  connect_uri.path      = $options.vhost || '/'
+  
+  puts "URI: #{connect_uri.to_s}"
+  operator = Emissary.call(:amqp, { :uri => connect_uri.to_s, :subscriptions => [] })
+  
+  class << operator
+    alias :original_receive :receive
+    def last_received=(value) @last_received = value; end
+    def last_received() @last_received ||= Time.now; end
+  
+    def receive message
+      last_received = Time.now
+      raise message.errors.first unless message.errors.empty? or not $options.raise_errors 
+      $stdout.puts sprintf("Instance Response Recieved: %s - response time: %.2fms\n", message.replyto, (1000 * (last_received.to_f - @send_time.to_f)))
+    end
+    
+    def send message
+      @send_time = Time.now
+      send_data message
+    end
+  end
+  
+  operator
+end
+
+
+EM.run {
+  message = get_message
+  operator = get_operator
+  
+  operator.connect
+  operator.subscribe
+  operator.send message
+
+  EM.add_periodic_timer(0.05) {
+    if Time.now.to_f - operator.last_received.to_f > $options.timeout.to_f
+      EM.stop
+      exit! 0
+    end
+  }
+}
