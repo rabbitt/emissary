@@ -42,7 +42,7 @@ spec = Gem::Specification.new do |s|
   s.test_files = FileList["{test}/**/*test.rb"].to_a
   s.has_rdoc = false
   s.extra_rdoc_files = ["README.txt"]
-  s.executables = ['emissary', 'emissary-setup']
+  s.executables = File.read('Manifest.txt').split(/\n+/).select { |f| f =~  /^bin/ }.collect { |f| f[/bin\/(.*)$/,1] }
 
   s.default_executable = 'bin/emissary-setup'
 
