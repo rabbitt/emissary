@@ -30,6 +30,8 @@ lib/emissary/agent/emissary.rb
 etc/init.d/emissary
 etc/emissary/config.ini
 bin/emissary-setup
+bin/emissary-send-message
 bin/emissary
+bin/amqp-listen
 VERSION.yml
 LICENSE
