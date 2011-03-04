@@ -49,13 +49,13 @@ spec = Gem::Specification.new do |s|
   s.add_dependency("daemons", ">= 1.0.10")
   s.add_dependency('inifile', '>= 0.3.0')
   s.add_dependency('sys-cpu', '>= 0.6.2')
-  s.add_dependency('bert', '>= 1.1.2')
+  s.add_dependency('bert',    '>= 1.1.2')
   s.add_dependency('amqp',    '>= 0.6.7')
-  s.add_dependency('carrot', '>= 0.7.1')
+  s.add_dependency('carrot',  '>= 0.8.1')
   s.add_dependency('eventmachine', '>= 0.12.10')
-  s.add_dependency('servolux', '>= 0.9.4')
-  s.add_dependency('uuid', '>= 2.3.0')
-  s.add_dependency('work_queue', '>= 1.0.0')
+  s.add_dependency('servolux',     '>= 0.9.4')
+  s.add_dependency('uuid',         '>= 2.3.0')
+  s.add_dependency('work_queue',   '>= 1.0.0')
 end
 
 require 'rake/gempackagetask'

@@ -19,7 +19,7 @@ module Emissary
     register :unix 
 
     def name
-      @hostname ||= `hostname`.strip
+      @hostname ||= `uname -n`.strip
     end
 
     alias :queue_name :name
