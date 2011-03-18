@@ -13,7 +13,9 @@
 #   limitations under the License.
 #
 #
+require 'rubygems'
 require 'eventmachine'
+gem 'amqp', '=0.6.7'
 require 'mq'
 require 'uri'
 
