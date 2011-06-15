@@ -120,6 +120,7 @@ module Emissary
         @connection.ping() unless @connection.nil?
       rescue ::Mysql::Error => e
         if e.message =~ /server has gone away/
+          ::Emissary.logger.notice "Agent::MySQL: MySQL server went away - reconnecting..."
           @connection = nil
         else
           raise e
@@ -131,7 +132,7 @@ module Emissary
   
     def disconnect
       unless not connected?
-        puts "disconnecting.."
+        ::Emissary.logger.notice "Agent::MySQL: disconnecting from MySQL Server .."
         @connection.close
         @connection = nil
       end
@@ -202,13 +203,13 @@ module Emissary
   
     def spawn_lockwatch_thread!
       if @watcher.is_a?(Thread) and not @watcher.alive?
-        puts "Watcher is dead - restarting"
+        ::Emissary.logger.notice "Agent::MySQL: Watcher is dead - restarting..."
         @watcher = nil
       end
       
       @watcher ||= Thread.new {
         begin
-          puts "Entering Watcher Loop"
+          ::Emissary.logger.debug "Agent::MySQL: Entering Watcher Loop"
           Timeout.timeout(@timeout) do
             loop { break unless locked? }
           end
