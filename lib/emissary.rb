@@ -17,6 +17,7 @@ require 'rubygems'
 require 'uuid'
 require 'digest/md5'
 require 'yaml'
+require 'pathname'
 
 begin
   require 'thread'
@@ -26,14 +27,14 @@ end
 
 module Emissary
   # :stopdoc:
-  LIBPATH = File.expand_path(File.dirname(File.expand_path(__FILE__))) + File::SEPARATOR
-  PATH = File.dirname(LIBPATH) + File::SEPARATOR
-  VERSION = ::YAML.load(File.read(File.join(PATH, 'VERSION.yml'))).values.join '.'
+  LIBPATH = Pathname.new(__FILE__).dirname.realpath 
+  PATH    = LIBPATH.dirname
+  VERSION = ::YAML.load(PATH + 'VERSION.yml').values.join '.'
 
-  EXTERNALS_BASE      = File.join(File::SEPARATOR, 'opt')
-  EXTERNAL_IDENTITIES = File.join(EXTERNALS_BASE, 'emissary', 'identities')
-  EXTERNAL_AGENTS     = File.join(EXTERNALS_BASE, 'emissary', 'agents')
-  EXTERNAL_OPERATORS  = File.join(EXTERNALS_BASE, 'emissary', 'operators')
+  EXTERNALS_BASE      = Pathname.new('/opt/emissary')
+  EXTERNAL_IDENTITIES = EXTERNALS_BASE + 'identities'
+  EXTERNAL_AGENTS     = EXTERNALS_BASE + 'agents'
+  EXTERNAL_OPERATORS  = EXTERNALS_BASE + 'operators'
 
   DEFAULT_EXCHANGE        = :direct
   DAEMON_RECHECK_INTERVAL = 10
@@ -58,7 +59,7 @@ module Emissary
     # <tt>File.join</tt>.
     #
     def libpath( *args )
-      args.empty? ? LIBPATH : File.join(LIBPATH, args.flatten)
+      LIBPATH.join(args.flatten)
     end
   
     # Returns the path for the module. If any arguments are given,
