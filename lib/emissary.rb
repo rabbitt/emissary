@@ -29,7 +29,7 @@ module Emissary
   # :stopdoc:
   LIBPATH = Pathname.new(__FILE__).dirname.realpath 
   PATH    = LIBPATH.dirname
-  VERSION = ::YAML.load(PATH + 'VERSION.yml').values.join '.'
+  VERSION = ::YAML.load(File.read(PATH + 'VERSION.yml')).values.join '.'
 
   EXTERNALS_BASE      = Pathname.new('/opt/emissary')
   EXTERNAL_IDENTITIES = EXTERNALS_BASE + 'identities'
