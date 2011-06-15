@@ -32,9 +32,9 @@ module Emissary
   VERSION = ::YAML.load(File.read(PATH + 'VERSION.yml')).values.join '.'
 
   EXTERNALS_BASE      = Pathname.new('/opt/emissary')
-  EXTERNAL_IDENTITIES = EXTERNALS_BASE + 'identities'
-  EXTERNAL_AGENTS     = EXTERNALS_BASE + 'agents'
-  EXTERNAL_OPERATORS  = EXTERNALS_BASE + 'operators'
+  EXTERNAL_IDENTITIES = (EXTERNALS_BASE + 'identities').to_s
+  EXTERNAL_AGENTS     = (EXTERNALS_BASE + 'agents').to_s
+  EXTERNAL_OPERATORS  = (EXTERNALS_BASE + 'operators').to_s
 
   DEFAULT_EXCHANGE        = :direct
   DAEMON_RECHECK_INTERVAL = 10
@@ -59,7 +59,7 @@ module Emissary
     # <tt>File.join</tt>.
     #
     def libpath( *args )
-      LIBPATH.join(args.flatten)
+      args.empty? ? LIBPATH.to_s : File.join(LIBPATH.to_s, args.flatten)
     end
   
     # Returns the path for the module. If any arguments are given,
@@ -67,11 +67,11 @@ module Emissary
     # <tt>File.join</tt>.
     #
     def path( *args )
-      args.empty? ? PATH : File.join(PATH, args.flatten)
+      args.empty? ? PATH.to_s : File.join(PATH.to_s, args.flatten)
     end
 
     def sublib_path( *args )
-      args.empty? ? PATH : File.join(LIBPATH, 'emissary', args.flatten)
+      args.empty? ? PATH.to_s : File.join(LIBPATH.to_s, 'emissary', args.flatten)
     end
     
     def klass_from_handler(klass = nil, handler = nil, *args)
@@ -217,7 +217,7 @@ module Emissary
   end
 end # module Emissary
 
-$:.unshift Emissary::LIBPATH
+$:.unshift Emissary::LIBPATH.to_s
 
 [ :errors, :logger, :operator, :agent, :identity, :message, :config, :gem_helper ].each do |sublib|
   require Emissary.sublib_path sublib.to_s
