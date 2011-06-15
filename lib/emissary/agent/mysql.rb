@@ -116,6 +116,16 @@ module Emissary
   
     
     def connection
+      begin
+        @connection.ping() unless @connection.nil?
+      rescue ::Mysql::Error => e
+        if e.message =~ /server has gone away/
+          @connection = nil
+        else
+          raise e
+        end
+      end
+      
       @connection ||= ::Mysql.real_connect(@host, @user, @password)
     end
   
@@ -165,8 +175,8 @@ module Emissary
           }
         end
       ensure
-        kill_watcher_thread!
         disconnect
+        kill_watcher_thread!
       end
     end
   
