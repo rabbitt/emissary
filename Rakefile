@@ -25,16 +25,16 @@ def manifest_files
 end
 
 GEM         = 'emissary'
-GEM_VERSION = YAML.load(File.read('VERSION.yml')).values.join('.').to_s
+GEM_VERSION = (v = YAML.load(File.read('VERSION.yml'))).keys.collect{|s|s.to_s}.sort.collect{|k| v[k.to_sym]}.join('.')
 AUTHOR      = 'Carl P. Corliss'
-EMAIL       = 'carl.corliss@nytimes.com'
+EMAIL       = 'rabbitt@gmail.com'
 
 spec = Gem::Specification.new do |s|
   s.name = GEM 
   s.version = GEM_VERSION
   s.author = AUTHOR
   s.email = EMAIL
-  s.homepage = "http://www.nytimes.com/"
+  s.homepage = "http://nimbul.github.com/nimbul/"
   s.platform = Gem::Platform::RUBY
   s.summary = "EventMachine/AMQP based event handling client"
   s.files = manifest_files()
@@ -58,8 +58,8 @@ spec = Gem::Specification.new do |s|
   s.add_dependency('work_queue',   '>= 1.0.0')
 end
 
-require 'rake/gempackagetask'
-Rake::GemPackageTask.new(spec) do |pkg|
+require 'rubygems/package_task'
+Gem::PackageTask.new(spec) do |pkg|
   pkg.need_tar = true
 end
 
